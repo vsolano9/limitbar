@@ -1,0 +1,27 @@
+name: Provider recipe or built-in request
+description: Share a working http/command recipe, or ask for a provider to be built in.
+labels: [provider]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most services can be added with an `http` or `command` source and no code change; see docs/providers.md.
+        Recipes that work for you are very welcome here. Never include real keys or tokens.
+  - type: input
+    id: service
+    attributes:
+      label: Service
+      placeholder: "e.g. OpenRouter credits"
+    validations:
+      required: true
+  - type: textarea
+    id: recipe
+    attributes:
+      label: Recipe (if you have one)
+      description: The source entry from your settings file, with secrets removed.
+      render: jsonc
+  - type: textarea
+    id: details
+    attributes:
+      label: Where the usage data comes from
+      description: Official API docs, the endpoint the vendor's CLI calls, a local file, etc.

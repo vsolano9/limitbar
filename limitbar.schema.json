@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/vsolano9/limitbar/main/limitbar.schema.json",
+  "title": "Limitbar settings",
+  "description": "%APPDATA%\\Limitbar\\config.json. Docs: https://github.com/vsolano9/limitbar/blob/main/docs/configuration.md",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "sources": {
+      "description": "What to show, in order. \"auto\" adds every signed-in built-in provider not listed explicitly.",
+      "type": "array",
+      "items": { "oneOf": [{ "const": "auto" }, { "$ref": "#/definitions/source" }] }
+    },
+    "poll_seconds": { "description": "Default seconds between checks (minimum 60).", "type": "integer", "minimum": 60, "default": 120 },
+    "position": {
+      "description": "auto: left end of a centred taskbar, next to the clock when Start is on the left.",
+      "enum": ["auto", "left", "right"],
+      "default": "auto"
+    },
+    "offset_x": { "description": "Extra logical pixels from the chosen edge.", "type": "integer", "default": 0 },
+    "theme": { "description": "auto follows the taskbar colour.", "enum": ["auto", "dark", "light"], "default": "auto" },
+    "appearance": { "$ref": "#/definitions/appearance" }
+  },
+  "definitions": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+      "description": "#RGB, #RGBA, #RRGGBB or #RRGGBBAA"
+    },
+    "colorPair": {
+      "oneOf": [
+        { "$ref": "#/definitions/color" },
+        {
+          "type": "object",
+          "properties": { "dark": { "$ref": "#/definitions/color" }, "light": { "$ref": "#/definitions/color" } },
+          "required": ["dark"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "palette": {
+      "type": "object",
+      "properties": {
+        "text": { "$ref": "#/definitions/color" },
+        "dim": { "$ref": "#/definitions/color" },
+        "track": { "$ref": "#/definitions/color" },
+        "warn": { "$ref": "#/definitions/color" },
+        "critical": { "$ref": "#/definitions/color" }
+      },
+      "additionalProperties": false
+    },
+    "appearance": {
+      "type": "object",
+      "properties": {
+        "font": { "type": "string", "default": "Segoe UI Variable Text" },
+        "font_size": { "type": "number", "minimum": 7, "maximum": 20, "default": 12 },
+        "bar_width": { "type": "number", "minimum": 8, "maximum": 200, "default": 44 },
+        "bar_height": { "type": "number", "minimum": 1, "maximum": 12, "default": 4 },
+        "gap": { "type": "number", "minimum": 0, "maximum": 80, "default": 18 },
+        "show_tags": { "type": "boolean", "default": true },
+        "show_percent": { "type": "boolean", "default": true },
+        "show": { "enum": ["used", "remaining"], "default": "used" },
+        "warn_at": { "type": "number", "minimum": 0, "maximum": 100, "default": 75 },
+        "critical_at": { "type": "number", "minimum": 0, "maximum": 100, "default": 90 },
+        "colors": {
+          "type": "object",
+          "properties": { "dark": { "$ref": "#/definitions/palette" }, "light": { "$ref": "#/definitions/palette" } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "bar": {
+      "oneOf": [
+        { "type": "string", "description": "Window key, e.g. five_hour, weekly, monthly, auto, api, or a custom key." },
+        {
+          "type": "object",
+          "properties": {
+            "key": {
+              "description": "A window key, or a list: the first one present is drawn.",
+              "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" }, "minItems": 1 }]
+            },
+            "tag": { "type": "string" },
+            "name": { "type": "string" },
+            "unit": { "type": "string" }
+          },
+          "required": ["key"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "commandLine": {
+      "description": "A string runs through cmd.exe; a list runs a program with arguments.",
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "array", "items": { "type": "string" }, "minItems": 1 }]
+    },
+    "valueSource": {
+      "oneOf": [
+        { "type": "string", "description": "A literal (not for secrets)." },
+        { "type": "object", "properties": { "env": { "type": "string" } }, "required": ["env"], "additionalProperties": false },
+        {
+          "type": "object",
+          "properties": { "file": { "type": "string" }, "json": { "type": "string", "description": "JSON path inside the file." } },
+          "required": ["file"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": { "credential": { "type": "string", "description": "Generic Windows Credential Manager entry." } },
+          "required": ["credential"],
+          "additionalProperties": false
+        },
+        { "type": "object", "properties": { "command": { "$ref": "#/definitions/commandLine" } }, "required": ["command"], "additionalProperties": false }
+      ]
+    },
+    "amount": {
+      "description": "A JSON path into the response, or a number.",
+      "oneOf": [{ "type": "string" }, { "type": "number" }]
+    },
+    "window": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "tag": { "type": "string" },
+        "name": { "type": "string" },
+        "unit": { "type": "string" },
+        "percent": { "$ref": "#/definitions/amount" },
+        "scale": { "type": "number", "description": "Multiplies percent (100 for fractions)." },
+        "used": { "$ref": "#/definitions/amount" },
+        "remaining": { "$ref": "#/definitions/amount" },
+        "limit": { "$ref": "#/definitions/amount" },
+        "default": { "type": "number", "description": "Percent used when the fields are missing." },
+        "resets_at": { "type": "string", "description": "JSON path to ISO 8601, unix seconds or ms." },
+        "resets_in": { "type": "string", "description": "JSON path to seconds until reset." }
+      },
+      "anyOf": [{ "required": ["percent"] }, { "required": ["used"] }, { "required": ["remaining"] }],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "provider": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file"] },
+        "kind": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file"], "description": "Older name for provider." },
+        "label": { "type": "string", "description": "Short tag on the taskbar." },
+        "name": { "type": "string", "description": "Name in the tooltip." },
+        "id": { "type": "string", "description": "Cache key; defaults to the name." },
+        "color": { "$ref": "#/definitions/colorPair" },
+        "bars": { "type": "array", "items": { "$ref": "#/definitions/bar" }, "maxItems": 3 },
+        "page": { "type": "string", "description": "Usage page for the right-click menu." },
+        "poll_seconds": { "type": "integer", "minimum": 15 },
+        "enabled": { "type": "boolean" },
+        "dir": { "type": "string", "description": "Built-ins: where the CLI keeps its sign-in." },
+        "url": { "type": "string", "description": "http: the endpoint." },
+        "method": { "type": "string" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "body": {},
+        "vars": { "type": "object", "additionalProperties": { "$ref": "#/definitions/valueSource" } },
+        "expires": {
+          "oneOf": [
+            { "type": "object", "properties": { "jwt": { "type": "string" } }, "required": ["jwt"], "additionalProperties": false },
+            { "$ref": "#/definitions/valueSource" }
+          ]
+        },
+        "windows": { "type": "array", "items": { "$ref": "#/definitions/window" }, "minItems": 1 },
+        "plan": { "type": "string" },
+        "account": { "type": "string" },
+        "note": { "type": "string" },
+        "command": { "$ref": "#/definitions/commandLine" },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 600 },
+        "path": { "type": "string", "description": "file: the JSON file to read." }
+      },
+      "anyOf": [{ "required": ["provider"] }, { "required": ["kind"] }],
+      "allOf": [
+        { "if": { "properties": { "provider": { "const": "http" } }, "required": ["provider"] }, "then": { "required": ["url", "windows"] } },
+        { "if": { "properties": { "provider": { "const": "command" } }, "required": ["provider"] }, "then": { "required": ["command"] } },
+        { "if": { "properties": { "provider": { "const": "file" } }, "required": ["provider"] }, "then": { "required": ["path"] } }
+      ]
+    }
+  }
+}

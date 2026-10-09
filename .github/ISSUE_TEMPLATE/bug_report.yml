@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in Limitbar does not work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please never paste tokens, API keys, cookies or full auth files. Redact them as `[REDACTED]`.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Output of `limitbar --probe`
+      description: Run it in a terminal and paste the output (it never prints secrets, but check before posting).
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: The relevant part of your settings file
+      description: "%APPDATA%\Limitbar\config.json, with any literal secrets removed."
+      render: jsonc
+  - type: input
+    id: version
+    attributes:
+      label: Limitbar and Windows version
+      placeholder: "Limitbar 2.0.0, Windows 11 24H2"
+    validations:
+      required: true

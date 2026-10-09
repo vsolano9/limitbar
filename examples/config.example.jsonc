@@ -1,0 +1,67 @@
+// A complete Limitbar settings file. Copy what you need into
+// %APPDATA%\Limitbar\config.json (right-click the widget > Edit settings).
+// Every option: docs/configuration.md. Every provider: docs/providers.md.
+{
+  "$schema": "https://raw.githubusercontent.com/vsolano9/limitbar/main/limitbar.schema.json",
+
+  "poll_seconds": 120,
+  "position": "auto",
+
+  "sources": [
+    // Restyle a built-in; "auto" below will not add it a second time.
+    { "provider": "codex", "label": "GPT", "color": { "dark": "#7FD1B9", "light": "#0F7A5C" } },
+
+    // Every other signed-in built-in: Claude Code accounts, Grok Build, Cursor Agent.
+    "auto",
+
+    // Hide one that "auto" would add.
+    { "provider": "grok", "enabled": false },
+
+    // A Claude Code login kept somewhere unusual, weekly window only.
+    { "provider": "claude", "dir": "D:\\profiles\\claude-work", "label": "CW", "name": "Claude (work)", "bars": ["weekly"] },
+
+    // GitHub API rate limit, with the GitHub CLI's token.
+    {
+      "provider": "http", "name": "GitHub API", "label": "GH",
+      "url": "https://api.github.com/rate_limit",
+      "vars": { "token": { "command": "gh auth token" } },
+      "headers": { "Authorization": "Bearer ${token}", "User-Agent": "limitbar" },
+      "windows": [
+        { "key": "core", "tag": "api", "name": "REST API requests", "used": "/resources/core/used", "limit": "/resources/core/limit", "resets_at": "/resources/core/reset" },
+        { "key": "search", "tag": "srch", "name": "Search requests", "used": "/resources/search/used", "limit": "/resources/search/limit", "resets_at": "/resources/search/reset" }
+      ],
+      "color": "#C9D1D9",
+      "page": "https://github.com/settings/tokens"
+    },
+
+    // OpenRouter credits; the management key lives in Windows Credential Manager:
+    //   cmdkey /generic:limitbar/openrouter /user:limitbar /pass:sk-or-...
+    {
+      "provider": "http", "name": "OpenRouter", "label": "OR",
+      "url": "https://openrouter.ai/api/v1/credits",
+      "vars": { "key": { "credential": "limitbar/openrouter" } },
+      "headers": { "Authorization": "Bearer ${key}" },
+      "windows": [ { "key": "credits", "tag": "$", "name": "Credits", "used": "/data/total_usage", "limit": "/data/total_credits", "unit": "USD" } ],
+      "page": "https://openrouter.ai/settings/credits",
+      "poll_seconds": 600
+    },
+
+    // A script (examples/disk-space.ps1) that prints Limitbar's provider format.
+    {
+      "provider": "command", "name": "Drive C", "label": "C:",
+      "command": ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "%USERPROFILE%\\limitbar\\disk-space.ps1", "-Drive", "C"],
+      "poll_seconds": 600
+    },
+
+    // A file some other tool keeps up to date.
+    { "provider": "file", "name": "Build minutes", "label": "CI", "path": "%LOCALAPPDATA%\\ci-usage.json", "poll_seconds": 60 }
+  ],
+
+  "appearance": {
+    "show": "used",
+    "warn_at": 75,
+    "critical_at": 90,
+    "bar_width": 44,
+    "gap": 18
+  }
+}
