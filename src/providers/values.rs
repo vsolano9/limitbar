@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn jwt_expiry() {
         // header {"alg":"HS256","typ":"JWT"}, payload {"sub":"u","exp":1796716831,"type":"session"}
-        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1IiwiZXhwIjoxNzk2NzE2ODMxLCJ0eXBlIjoic2Vzc2lvbiJ9.sig";
+        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1IiwiZXhwIjoxNzk2NzE2ODMxLCJ0eXBlIjoic2Vzc2lvbiJ9.sig"; // gitleaks:allow (synthetic test token, signature "sig")
         assert_eq!(jwt_exp(token), Some(1_796_716_831));
         assert_eq!(jwt_exp("not-a-jwt"), None);
         assert_eq!(jwt_exp("a.@@@.c"), None);

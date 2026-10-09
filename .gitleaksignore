@@ -1,0 +1,2 @@
+# Synthetic JWT in a unit test (payload {"sub":"u",...}, signature "sig"); not a credential.
+b8e6c41d12abfd0420d9283f19ebd293e79dc48c:src/providers/values.rs:generic-api-key:113
