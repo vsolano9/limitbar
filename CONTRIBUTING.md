@@ -77,3 +77,17 @@ user, never paid APIs, and keep requests to one or two per check.
 - No new dependencies without a strong reason; `serde_json` and `windows-sys`
   are the only ones today.
 - Comments explain why, not what. User-visible text is plain and specific.
+
+## Releases
+
+Bump the version in `Cargo.toml` and `res/limitbar.rc`, add a CHANGELOG entry,
+then build the release exe with your local paths remapped (Rust embeds
+dependency source paths in the binary):
+
+```powershell
+$env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE\.cargo=~/.cargo --remap-path-prefix=$env:USERPROFILE\.rustup=~/.rustup --remap-path-prefix=$PWD=."
+cargo build --release
+```
+
+Attach `limitbar.exe` and its SHA-256 (`limitbar.exe.sha256`) to a GitHub
+release tagged `v<version>`.
