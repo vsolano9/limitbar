@@ -1,7 +1,8 @@
 //! Background polling. Each source is checked on its own interval, all due
 //! sources in parallel; results are posted to the UI thread as they arrive.
-//! A worker belongs to one settings generation and stops when the settings
-//! are reloaded.
+//! `system` sources are sampled by a thread of their own every few seconds
+//! and never cached. A worker belongs to one settings generation and stops
+//! when the settings are reloaded.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,6 +16,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_APP};
 use crate::config::{Source, state_path};
 use crate::net::Http;
 use crate::providers::{self, Outcome, Profile};
+use crate::system::Sampler;
 use crate::time::now;
 use crate::usage::{self, Reading};
 
@@ -26,8 +28,16 @@ const MIN_GAP: i64 = 10;
 
 pub struct Update {
     pub generation: u64,
+    /// Index of the source's view.
     pub idx: usize,
     pub outcome: Outcome,
+}
+
+/// A source to poll: its view index, settings and cached reading.
+pub struct Polled {
+    pub idx: usize,
+    pub src: Source,
+    pub cached: Option<Reading>,
 }
 
 /// The UI's handle on a running worker.
@@ -86,21 +96,69 @@ fn post(hwnd: isize, msg: u32, update: Option<Update>) {
     }
 }
 
-/// Starts a worker for `sources` (with their cached readings) that posts to `hwnd`.
-pub fn spawn(generation: u64, sources: Vec<Source>, cached: Vec<Option<Reading>>, hwnd: isize) -> Worker {
+/// Starts a worker for the `polled` usage sources and the `system` sources
+/// (with their view indexes) that posts to `hwnd`.
+pub fn spawn(generation: u64, polled: Vec<Polled>, system: Vec<(usize, Source)>, hwnd: isize) -> Worker {
     let wake = unsafe { windows_sys::Win32::System::Threading::CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) } as isize;
     let current = Arc::new(AtomicU64::new(generation));
     let worker = Worker { generation, wake, current: current.clone() };
+    if !system.is_empty() {
+        let current = current.clone();
+        std::thread::spawn(move || sample(generation, &system, hwnd, &current));
+    }
     std::thread::spawn(move || {
+        let slots: Vec<usize> = polled.iter().map(|p| p.idx).collect();
+        let (sources, cached): (Vec<Source>, Vec<Option<Reading>>) = polled.into_iter().map(|p| (p.src, p.cached)).unzip();
         if let Some(http) = Http::new(providers::user_agent()) {
-            run(&http, generation, &sources, cached, hwnd, wake, &current);
+            run(&http, generation, &sources, &slots, cached, hwnd, wake, &current);
         }
         unsafe { CloseHandle(wake as _) };
     });
     worker
 }
 
-fn run(http: &Http, generation: u64, sources: &[Source], cached: Vec<Option<Reading>>, hwnd: isize, wake: isize, current: &AtomicU64) {
+/// Samples this PC for every `system` source until the generation ends. The
+/// first sample only primes the load counters, so the second follows quickly.
+fn sample(generation: u64, sources: &[(usize, Source)], hwnd: isize, current: &AtomicU64) {
+    let alive = || current.load(Ordering::SeqCst) == generation;
+    let metrics: Vec<String> = sources.iter().flat_map(|(_, s)| s.metrics()).collect();
+    let top = sources.iter().map(|(_, s)| s.system_top()).max().unwrap_or(0);
+    let interval = sources.iter().map(|(_, s)| s.poll_seconds).min().unwrap_or(2).max(1);
+    let mut sampler = Sampler::new(&metrics, top);
+    sampler.sample(now());
+    let mut wait = std::time::Duration::from_millis(1000);
+    loop {
+        // Short naps so a reload or exit is noticed within a quarter second.
+        let until = std::time::Instant::now() + wait;
+        while std::time::Instant::now() < until {
+            if !alive() {
+                return;
+            }
+            std::thread::sleep((until - std::time::Instant::now()).min(std::time::Duration::from_millis(250)));
+        }
+        if !alive() {
+            return;
+        }
+        let snap = sampler.sample(now());
+        for (idx, src) in sources {
+            let reading = snap.reading(&src.metrics(), src.system_top());
+            post(hwnd, WM_APP_UPDATE, Some(Update { generation, idx: *idx, outcome: Outcome::Fresh(reading) }));
+        }
+        wait = std::time::Duration::from_secs(interval);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run(
+    http: &Http,
+    generation: u64,
+    sources: &[Source],
+    slots: &[usize],
+    cached: Vec<Option<Reading>>,
+    hwnd: isize,
+    wake: isize,
+    current: &AtomicU64,
+) {
     let alive = || current.load(Ordering::SeqCst) == generation;
     let mut readings = cached;
     let mut profiles: Vec<Profile> = readings.iter().map(|r| Profile::from_cache(r.as_ref())).collect();
@@ -128,12 +186,13 @@ fn run(http: &Http, generation: u64, sources: &[Source], cached: Vec<Option<Read
                 .filter(|(i, _)| due.contains(i))
                 .map(|(idx, profile)| {
                     let src = &sources[idx];
+                    let slot = slots[idx];
                     let blocked = blocked_until[idx];
                     scope.spawn(move || {
                         let outcome = if blocked > now() { Outcome::Limited(blocked) } else { providers::fetch(http, src, profile) };
                         // Post as soon as it is known; the UI keeps its own copy.
                         if alive() {
-                            post(hwnd, WM_APP_UPDATE, Some(Update { generation, idx, outcome: outcome.clone() }));
+                            post(hwnd, WM_APP_UPDATE, Some(Update { generation, idx: slot, outcome: outcome.clone() }));
                         }
                         (idx, outcome)
                     })

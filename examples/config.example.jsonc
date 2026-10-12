@@ -54,7 +54,11 @@
     },
 
     // A file some other tool keeps up to date.
-    { "provider": "file", "name": "Build minutes", "label": "CI", "path": "%LOCALAPPDATA%\\ci-usage.json", "poll_seconds": 60 }
+    { "provider": "file", "name": "Build minutes", "label": "CI", "path": "%LOCALAPPDATA%\\ci-usage.json", "poll_seconds": 60 },
+
+    // This PC's load, like Task Manager's Processes tab, sampled every 2 seconds.
+    { "provider": "system", "bars": ["cpu", "memory", "gpu"] },
+    { "provider": "system", "label": "IO", "bars": ["disk", "network"], "top": 5 }
   ],
 
   "appearance": {

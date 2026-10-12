@@ -8,6 +8,7 @@
 use serde_json::{Value, json};
 
 use crate::jpath;
+use crate::system;
 use crate::time::parse_iso8601;
 
 pub const FIVE_HOUR: &str = "five_hour";
@@ -28,6 +29,11 @@ const NAMES: &[(&str, &str, &str)] = &[
     (MONTHLY, "mo", "Monthly"),
     (CURSOR_AUTO, "cur", "Cursor models (Auto + Composer)"),
     (CURSOR_API, "api", "Other models (API)"),
+    (system::CPU, "cpu", "CPU"),
+    (system::MEMORY, "mem", "Memory"),
+    (system::GPU, "gpu", "GPU"),
+    (system::DISK, "disk", "Disk"),
+    (system::NETWORK, "net", "Network"),
 ];
 
 pub fn known_tag(key: &str) -> Option<&'static str> {
@@ -71,6 +77,12 @@ pub struct Label {
     pub tag: Option<String>,
     pub name: Option<String>,
     pub unit: Option<String>,
+    /// Tooltip text after the percentage, e.g. `3D engine`.
+    pub info: Option<String>,
+    /// An extra tooltip line under the window, e.g. the busiest processes.
+    pub detail: Option<String>,
+    /// Tooltip verbs for normal and "remaining" mode; default `used`/`left`.
+    pub verbs: Option<(&'static str, &'static str)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -182,7 +194,7 @@ pub fn parse_report(v: &Value, now: i64) -> Report {
         r.add(&key, Window { used, resets_at, value, limit: n("limit") });
         let text = |k: &str| w.get(k).and_then(jpath::text);
         if text("tag").is_some() || text("name").is_some() || text("unit").is_some() {
-            r.labels.push(Label { key: key.clone(), tag: text("tag"), name: text("name"), unit: text("unit") });
+            r.labels.push(Label { key: key.clone(), tag: text("tag"), name: text("name"), unit: text("unit"), ..Default::default() });
         }
     }
     if r.windows.is_empty() {
@@ -251,7 +263,7 @@ pub fn reading_from_json(v: &Value) -> Option<Reading> {
                 let key = w.get("key")?.as_str()?.to_owned();
                 let t = |f: &str| w.get(f).and_then(Value::as_str).map(str::to_owned);
                 if t("tag").is_some() || t("name").is_some() || t("unit").is_some() {
-                    labels.push(Label { key: key.clone(), tag: t("tag"), name: t("name"), unit: t("unit") });
+                    labels.push(Label { key: key.clone(), tag: t("tag"), name: t("name"), unit: t("unit"), ..Default::default() });
                 }
                 Some((key, window(w)?))
             })

@@ -89,6 +89,10 @@
         }
       ]
     },
+    "systemMetric": {
+      "description": "cpu, memory, gpu, disk or network, as Task Manager's Processes tab shows them.",
+      "enum": ["cpu", "memory", "gpu", "disk", "network"]
+    },
     "commandLine": {
       "description": "A string runs through cmd.exe; a list runs a program with arguments.",
       "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "array", "items": { "type": "string" }, "minItems": 1 }]
@@ -138,15 +142,16 @@
     "source": {
       "type": "object",
       "properties": {
-        "provider": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file"] },
-        "kind": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file"], "description": "Older name for provider." },
+        "provider": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file", "system"] },
+        "kind": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file", "system"], "description": "Older name for provider." },
         "label": { "type": "string", "description": "Short tag on the taskbar." },
         "name": { "type": "string", "description": "Name in the tooltip." },
         "id": { "type": "string", "description": "Cache key; defaults to the name." },
         "color": { "$ref": "#/definitions/colorPair" },
         "bars": { "type": "array", "items": { "$ref": "#/definitions/bar" }, "maxItems": 3 },
         "page": { "type": "string", "description": "Usage page for the right-click menu." },
-        "poll_seconds": { "type": "integer", "minimum": 15 },
+        "poll_seconds": { "type": "integer", "minimum": 1, "description": "Seconds between checks: at least 60 for built-ins, 15 for http/command/file; system sources sample every 1-60 s (default 2)." },
+        "top": { "type": "integer", "minimum": 0, "maximum": 10, "default": 3, "description": "system: busiest processes listed per metric in the tooltip (0 for none)." },
         "enabled": { "type": "boolean" },
         "dir": { "type": "string", "description": "Built-ins: where the CLI keeps its sign-in." },
         "url": { "type": "string", "description": "http: the endpoint." },
@@ -172,7 +177,28 @@
       "allOf": [
         { "if": { "properties": { "provider": { "const": "http" } }, "required": ["provider"] }, "then": { "required": ["url", "windows"] } },
         { "if": { "properties": { "provider": { "const": "command" } }, "required": ["provider"] }, "then": { "required": ["command"] } },
-        { "if": { "properties": { "provider": { "const": "file" } }, "required": ["provider"] }, "then": { "required": ["path"] } }
+        { "if": { "properties": { "provider": { "const": "file" } }, "required": ["provider"] }, "then": { "required": ["path"] } },
+        {
+          "if": { "properties": { "provider": { "const": "system" } }, "required": ["provider"] },
+          "then": {
+            "properties": {
+              "poll_seconds": { "maximum": 60 },
+              "bars": {
+                "items": {
+                  "oneOf": [
+                    { "$ref": "#/definitions/systemMetric" },
+                    {
+                      "type": "object",
+                      "properties": { "key": { "$ref": "#/definitions/systemMetric" }, "tag": { "type": "string" }, "name": { "type": "string" } },
+                      "required": ["key"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       ]
     }
   }

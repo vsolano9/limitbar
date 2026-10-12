@@ -1,7 +1,8 @@
 # Configuration
 
 Limitbar works without any settings: it shows every built-in provider it finds
-signed in on your PC. To change what it shows or how it looks, right-click the
+signed in on your PC. It can also show this PC's own CPU, memory, GPU, disk and
+network load (a [`system` source](providers.md#system)). To change what it shows or how it looks, right-click the
 widget and choose **Edit settings…**. That opens
 `%APPDATA%\Limitbar\config.json`, creating a starter file the first time.
 
@@ -63,14 +64,14 @@ Without `"auto"`, only the sources you list are shown.
 
 | Option | Meaning |
 |---|---|
-| `provider` | Required. `claude`, `codex`, `grok`, `cursor`, `http`, `command` or `file`. (`kind` is accepted too.) |
-| `label` | Short tag on the taskbar. Built-ins default to `CL`, `CX`, `GK`, `CU`; custom sources to the first two letters of `name`. |
+| `provider` | Required. `claude`, `codex`, `grok`, `cursor`, `http`, `command`, `file` or `system`. (`kind` is accepted too.) |
+| `label` | Short tag on the taskbar. Built-ins default to `CL`, `CX`, `GK`, `CU`, system sources to `PC`; custom sources to the first two letters of `name`. |
 | `name` | Name at the top of the tooltip. |
 | `id` | Key for the cached values. Defaults to `name` in lower case without spaces; change it only to keep history when renaming. |
 | `color` | Accent colour: `"#RRGGBB"` (also `#RGB`, `#RRGGBBAA`), or `{ "dark": "#…", "light": "#…" }` for a different shade on a light taskbar. Custom sources get a colour from a built-in palette. |
 | `bars` | Which windows to draw as rows, top to bottom (at most 3; the tooltip lists all). See [Bars](#bars). |
-| `page` | Web page for the right-click menu ("Open … usage page"). Built-ins link to their provider's usage page. |
-| `poll_seconds` | Seconds between checks for this source. Minimum 60 for built-ins, 15 for custom providers. |
+| `page` | Web page for the right-click menu ("Open … usage page"). Built-ins link to their provider's usage page; system sources add **Open Task Manager**. |
+| `poll_seconds` | Seconds between checks for this source. Minimum 60 for built-ins, 15 for custom providers. System sources sample every 2 seconds by default (1 to 60). |
 | `enabled` | `false` hides the source. |
 
 Options for specific providers:
@@ -81,6 +82,7 @@ Options for specific providers:
 | `http` | `url`, `method`, `headers`, `body`, `vars`, `expires`, `windows`, `plan`, `account`, `note` | See [providers.md](providers.md#http). |
 | `command` | `command`, `timeout_seconds` | See [providers.md](providers.md#command). |
 | `file` | `path` | See [providers.md](providers.md#file). |
+| `system` | `top` | Busiest processes listed per metric in the tooltip (default 3, `0` for none). See [providers.md](providers.md#system). |
 
 ### Bars
 
@@ -95,6 +97,11 @@ and, usually, a reset time. Each has a key:
 | `monthly` | `mo` | Grok (when the server reports a monthly period) |
 | `auto` | `cur` | Cursor: Cursor models (Auto + Composer) |
 | `api` | `api` | Cursor: other models (named third-party models) |
+| `cpu` | `cpu` | System: processor time |
+| `memory` | `mem` | System: memory in use |
+| `gpu` | `gpu` | System: busiest GPU engine |
+| `disk` | `disk` | System: disk active time |
+| `network` | `net` | System: busiest network adapter |
 
 Custom providers use whatever keys they define.
 
@@ -108,7 +115,8 @@ Custom providers use whatever keys they define.
 ```
 
 Built-ins default to their usual rows (Claude: `5h` and `wk`; Codex: `wk`;
-Grok: its credit period; Cursor: `cur` and `api`). `http` sources default to
+Grok: its credit period; Cursor: `cur` and `api`; system: `cpu`, `mem` and
+`gpu`). `http` sources default to
 their `windows`; `command` and `file` sources without `bars` draw the first
 three windows they report.
 
@@ -141,7 +149,7 @@ always follow the percentage *used*, also in `"remaining"` mode.
 | Path | What |
 |---|---|
 | `%APPDATA%\Limitbar\config.json` | Settings (yours; never written by Limitbar except to create the starter file). |
-| `%LOCALAPPDATA%\Limitbar\state.json` | Last values per source, so the widget shows numbers immediately after a restart. No secrets. |
+| `%LOCALAPPDATA%\Limitbar\state.json` | Last values per source, so the widget shows numbers immediately after a restart. No secrets. System load is never stored. |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Limitbar` | Present when **Start with Windows** is checked. |
 
 ## Command line

@@ -72,24 +72,45 @@ pub fn shown(w: &Window, now: i64, remaining: bool) -> f64 {
     if remaining { 100.0 - used } else { used }
 }
 
+/// One window in the tooltip.
+#[derive(Debug)]
+pub struct TipEntry {
+    pub key: String,
+    pub name: String,
+    pub window: Option<Window>,
+    pub unit: Option<String>,
+    pub info: Option<String>,
+    pub detail: Option<String>,
+    pub verbs: (&'static str, &'static str),
+}
+
+fn entry(key: &str, bar: Option<&Bar>, reading: Option<&Reading>, window: Option<Window>) -> TipEntry {
+    let label = reading.and_then(|r| r.label(key));
+    TipEntry {
+        key: key.to_owned(),
+        name: name(key, bar, reading),
+        window,
+        unit: unit(key, bar, reading),
+        info: label.and_then(|l| l.info.clone()),
+        detail: label.and_then(|l| l.detail.clone()),
+        verbs: label.and_then(|l| l.verbs).unwrap_or(("used", "left")),
+    }
+}
+
 /// Tooltip entries: each drawn row (present or not) plus every other window
 /// the provider reported, well-known keys in their usual order.
-pub fn tooltip_windows(src: &Source, reading: Option<&Reading>) -> Vec<(String, String, Option<Window>, Option<String>)> {
+pub fn tooltip_windows(src: &Source, reading: Option<&Reading>) -> Vec<TipEntry> {
     let drawn = rows(src, reading);
-    let mut out: Vec<(String, String, Option<Window>, Option<String>)> = drawn
-        .iter()
-        .filter(|r| !r.key.is_empty())
-        .map(|r| (r.key.clone(), name(&r.key, r.bar, reading), r.window, unit(&r.key, r.bar, reading)))
-        .collect();
+    let mut out: Vec<TipEntry> = drawn.iter().filter(|r| !r.key.is_empty()).map(|r| entry(&r.key, r.bar, reading, r.window)).collect();
     if let Some(r) = reading {
         for (k, w) in &r.windows {
-            if !out.iter().any(|(o, ..)| o == k) {
+            if !out.iter().any(|o| &o.key == k) {
                 let bar = src.bars.iter().find(|b| b.keys.contains(k));
-                out.push((k.clone(), name(k, bar, reading), Some(*w), unit(k, bar, reading)));
+                out.push(entry(k, bar, reading, Some(*w)));
             }
         }
     }
-    out.sort_by_key(|(k, ..)| usage::order(k));
+    out.sort_by_key(|e| usage::order(&e.key));
     out
 }
 
@@ -103,22 +124,19 @@ fn amount(n: f64) -> String {
     }
 }
 
-/// One tooltip line for a usage window. `day_clock` formats a reset time.
-pub fn window_line(
-    name: &str,
-    w: Option<Window>,
-    unit: Option<&str>,
-    now: i64,
-    remaining: bool,
-    day_clock: impl Fn(i64, i64) -> String,
-) -> String {
-    let Some(w) = w else { return format!("{name}: not reported") };
-    let verb = if remaining { "left" } else { "used" };
+/// The tooltip line for a usage window. `day_clock` formats a reset time.
+pub fn window_line(e: &TipEntry, now: i64, remaining: bool, day_clock: impl Fn(i64, i64) -> String) -> String {
+    let name = &e.name;
+    let Some(w) = e.window else { return format!("{name}: not reported") };
+    let verb = if remaining { e.verbs.1 } else { e.verbs.0 };
     let mut s = format!("{name}: {}% {verb}", shown(&w, now, remaining).round());
     let reset = w.resets_at > 0 && now >= w.resets_at;
     if let (Some(v), Some(l), false) = (w.value, w.limit, reset) {
-        let u = unit.map(|u| format!(" {u}")).unwrap_or_default();
+        let u = e.unit.as_ref().map(|u| format!(" {u}")).unwrap_or_default();
         s.push_str(&format!(" ({} of {}{u})", amount(v), amount(l)));
+    }
+    if let Some(info) = &e.info {
+        s.push_str(&format!(" \u{00B7} {info}"));
     }
     if reset {
         s.push_str(&format!(" \u{00B7} window reset at {}", day_clock(w.resets_at, now)));
@@ -156,14 +174,14 @@ mod tests {
         assert_eq!(drawn.len(), 1);
         assert_eq!((drawn[0].key.as_str(), drawn[0].window.unwrap().used), (WEEKLY, 40.0));
         // The undrawn 5-hour window is still listed, first.
-        let keys: Vec<String> = tooltip_windows(&codex, Some(&r)).into_iter().map(|t| t.0).collect();
+        let keys: Vec<String> = tooltip_windows(&codex, Some(&r)).into_iter().map(|t| t.key).collect();
         assert_eq!(keys, [FIVE_HOUR, WEEKLY]);
         let grok = source(r#"{"provider":"grok"}"#);
         let drawn = rows(&grok, Some(&reading(&[("monthly", 5.0)])));
         assert_eq!((drawn[0].key.as_str(), tag(&drawn[0].key, drawn[0].bar, None).as_str()), ("monthly", "mo"));
         assert_eq!(rows(&grok, None)[0].key, WEEKLY);
         let cursor = source(r#"{"provider":"cursor"}"#);
-        let keys: Vec<String> = tooltip_windows(&cursor, None).into_iter().map(|t| t.0).collect();
+        let keys: Vec<String> = tooltip_windows(&cursor, None).into_iter().map(|t| t.key).collect();
         assert_eq!(keys, ["auto", "api"]);
         assert!(matches!(cursor.provider, Provider::Builtin { .. }));
     }
@@ -175,7 +193,13 @@ mod tests {
         assert_eq!(rows(&src, None)[0].key, "");
         assert!(tooltip_windows(&src, None).is_empty());
         let mut r = reading(&[("credits", 25.0), ("a", 1.0), ("b", 2.0), ("c", 3.0)]);
-        r.labels.push(Label { key: "credits".into(), tag: Some("$".into()), name: Some("API credits".into()), unit: Some("USD".into()) });
+        r.labels.push(Label {
+            key: "credits".into(),
+            tag: Some("$".into()),
+            name: Some("API credits".into()),
+            unit: Some("USD".into()),
+            ..Default::default()
+        });
         let drawn = rows(&src, Some(&r));
         assert_eq!(drawn.len(), MAX_BARS);
         assert_eq!(tag("credits", None, Some(&r)), "$");
@@ -184,7 +208,7 @@ mod tests {
         assert_eq!(possible_keys(&src, Some(&r)), ["credits", "a", "b"]);
         let tips = tooltip_windows(&src, Some(&r));
         assert_eq!(tips.len(), 4);
-        assert_eq!(tips[0].3.as_deref(), Some("USD"));
+        assert_eq!(tips[0].unit.as_deref(), Some("USD"));
         let with_bars = source(r#"{"provider":"file","path":"x","bars":[{"key":"credits","tag":"cr","name":"Credits"}]}"#);
         let drawn = rows(&with_bars, Some(&r));
         assert_eq!(tag(&drawn[0].key, drawn[0].bar, Some(&r)), "cr");
@@ -194,21 +218,33 @@ mod tests {
     #[test]
     fn lines() {
         let clock = |_: i64, _: i64| "9:00 PM".to_owned();
+        let e = |name: &str, window: Option<Window>, unit: Option<&str>| TipEntry {
+            key: String::new(),
+            name: name.into(),
+            window,
+            unit: unit.map(str::to_owned),
+            info: None,
+            detail: None,
+            verbs: ("used", "left"),
+        };
         let w = Window { used: 25.0, resets_at: 3700, value: Some(12.5), limit: Some(50.0) };
         assert_eq!(
-            window_line("Credits", Some(w), Some("USD"), 100, false, clock),
+            window_line(&e("Credits", Some(w), Some("USD")), 100, false, clock),
             "Credits: 25% used (12.5 of 50 USD) \u{00B7} resets 9:00 PM (in 1h 00m)"
         );
         assert_eq!(
-            window_line("Credits", Some(w), None, 100, true, clock),
+            window_line(&e("Credits", Some(w), None), 100, true, clock),
             "Credits: 75% left (12.5 of 50) \u{00B7} resets 9:00 PM (in 1h 00m)"
         );
         assert_eq!(
-            window_line("Weekly", Some(Window::pct(80.0, 50)), None, 100, false, clock),
+            window_line(&e("Weekly", Some(Window::pct(80.0, 50)), None), 100, false, clock),
             "Weekly: 0% used \u{00B7} window reset at 9:00 PM"
         );
-        assert_eq!(window_line("Daily", Some(Window::pct(33.4, 0)), None, 100, false, clock), "Daily: 33% used");
-        assert_eq!(window_line("5-hour", None, None, 100, false, clock), "5-hour: not reported");
+        assert_eq!(window_line(&e("Daily", Some(Window::pct(33.4, 0)), None), 100, false, clock), "Daily: 33% used");
+        assert_eq!(window_line(&e("5-hour", None, None), 100, false, clock), "5-hour: not reported");
+        let gpu = TipEntry { info: Some("3D engine".into()), verbs: ("busy", "idle"), ..e("GPU", Some(Window::pct(14.0, 0)), None) };
+        assert_eq!(window_line(&gpu, 100, false, clock), "GPU: 14% busy \u{00B7} 3D engine");
+        assert_eq!(window_line(&gpu, 100, true, clock), "GPU: 86% idle \u{00B7} 3D engine");
         assert_eq!(amount(1234.567), "1235");
         assert_eq!(amount(3.10), "3.1");
         assert_eq!(shown(&Window::pct(30.0, 0), 1, true), 70.0);

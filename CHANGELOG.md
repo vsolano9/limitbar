@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0 - 2026-10-12
+
+- **This PC's load**: a new `system` provider shows CPU, memory, GPU, disk and network use as Task Manager's Processes tab reports them, sampled every 2 seconds (`poll_seconds`, 1 to 60). It is optional: add `{ "provider": "system" }` to `sources` for a `PC` block with `cpu`, `mem` and `gpu`, or pick up to three metrics per source with `bars`.
+  - Tooltips list the busiest processes per metric (`top`, default 3), grouped by name like Task Manager (`chrome (18) 1.4 GB`), plus details: used and total memory, the busiest GPU engine, disk throughput and the busiest disk, the network adapter and its link speed.
+  - Only the configured metrics are measured, and system values are never cached. The menu gains **Open Task Manager**. The starter settings file includes a disabled `system` entry.
+- Tooltip lines can carry extra details. System load reads "busy"/"idle" (memory "used"/"free") instead of "used"/"left".
+- `--probe` measures system sources over one second and prints their process lists. It no longer panics when its output is cut short (`limitbar --probe | Select -First 3`).
+
 ## 2.0.0 - 2026-10-09
 
 First open-source release (MIT).

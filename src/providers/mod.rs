@@ -2,7 +2,8 @@
 //! function that reads the CLI's stored sign-in (never refreshing or writing
 //! it), asks the provider's usage endpoint and returns a [`Reading`]. The
 //! generic `http`, `command` and `file` providers cover everything else from
-//! the settings file. See CONTRIBUTING.md for adding a built-in provider.
+//! the settings file, and `system` measures this PC (see `system.rs`). See
+//! CONTRIBUTING.md for adding a built-in provider.
 
 mod claude;
 mod codex;
@@ -64,6 +65,7 @@ pub fn fetch(http: &Http, src: &Source, profile: &mut Profile) -> Outcome {
         Provider::Http(spec) => http::fetch(http, spec),
         Provider::Command { line, timeout } => command::fetch(line, *timeout),
         Provider::File { path } => file::fetch(path),
+        Provider::System { top } => Ok(crate::system::measure(&src.metrics(), *top)),
     };
     result.map_or_else(|o| o, Outcome::Fresh)
 }

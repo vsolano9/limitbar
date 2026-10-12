@@ -3,11 +3,17 @@
 A tiny widget that lives inside the Windows 11 taskbar and shows how much of
 your AI plan limits you have used: Claude, Codex, Grok and Cursor out of the
 box, and any other provider, API or quota you add in a few lines of settings.
+It can also show your PC's CPU, memory, GPU, disk and network load.
 
 ![Limitbar in the Windows 11 taskbar](docs/images/limitbar-taskbar.png)
 
 *Claude, Codex, Grok and Cursor built in, plus two custom sources: the GitHub
 API rate limit (`http`) and disk usage on C: (`command`).*
+
+![Limitbar with a PC block showing CPU, memory and GPU load](docs/images/limitbar-system.png)
+
+*Three Claude Code accounts, Codex, Grok and Cursor, and a `system` source (`PC`)
+with live CPU, memory and GPU load.*
 
 - **Zero setup** for Claude Code, Codex, Grok Build and Cursor Agent: it finds
   every signed-in CLI (and every Claude Code account) and shows its 5-hour,
@@ -15,10 +21,14 @@ API rate limit (`http`) and disk usage on C: (`command`).*
 - **Any provider, as many as you want**: point an `http` source at a JSON
   endpoint, run a script with a `command` source, or read a `file` another tool
   writes. No rebuilding, no plugins.
+- **Your PC's load too** (optional): CPU, memory, GPU, disk and network as
+  Task Manager's Processes tab shows them, updated every 2 seconds, with the
+  busiest processes in the tooltip. Add `{ "provider": "system" }`.
 - **Yours to style**: labels, colours, which bars, used or remaining, fonts,
   sizes, thresholds, position. Settings reload as you save.
-- **Tiny**: one 0.55 MB native exe (Rust, Win32, WinHTTP). No runtime, no
-  browser engine. A few MB of memory and no CPU between checks.
+- **Tiny**: one 0.6 MB native exe (Rust, Win32, WinHTTP). No runtime, no
+  browser engine. About 12 MB of private memory and no CPU between checks;
+  about half a percent of one core with the PC load block on.
 - **Read-only with your sign-ins**: never refreshes, writes or logs a token.
 
 Hover a block for the account, plan, exact numbers, reset times and when it
@@ -85,8 +95,9 @@ built-ins and add whatever else you want:
 ```
 
 - [docs/providers.md](docs/providers.md): the built-in providers, the `http`,
-  `command` and `file` providers, and ready-to-paste examples (GitHub API rate
-  limit, OpenRouter credits, extra Claude accounts, disk space, …).
+  `command` and `file` providers, the `system` provider for this PC's load, and
+  ready-to-paste examples (GitHub API rate limit, OpenRouter credits, extra
+  Claude accounts, disk space, …).
 - [docs/configuration.md](docs/configuration.md): every setting, the
   appearance options and the command line.
 
@@ -101,6 +112,11 @@ Settings: C:\Users\me\AppData\Roaming\Limitbar\config.json
 C1   Claude 1     ok     5h 4.0% (resets 4:30 PM, in 3h 17m) | wk 89.0% (resets Tue 9:00 PM, in 4d 7h) | plan Max 20x
 CX   Codex        ok     wk 100.0% (resets Wed 5:51 AM, in 4d 16h) | plan Pro
 GH   GitHub API   ok     api 0.1% (resets 2:13 PM, in 1h 00m) | srch 0.0% (resets 1:14 PM, in 1m)
+PC   This PC      ok     cpu 48.7% | mem 78.0% (24.9 of 31.9 GB) | gpu 49.3%
+                         cpu: qemu-system-x86_64-headless 13% · python (7) 8% · System 5%
+                         mem: claude (8) 3.7 GB · RobloxStudioBeta 2.5 GB · qemu-system-x86_64-headless 873 MB
+                         gpu: 3D engine
+                         gpu: RobloxStudioBeta 32% · qemu-system-x86_64-headless 11%
 ```
 
 ## How it works
@@ -115,6 +131,8 @@ GH   GitHub API   ok     api 0.1% (resets 2:13 PM, in 1h 00m) | srch 0.0% (reset
 - Every source is polled on its own interval (default 2 minutes), in parallel.
   Clicks refresh at most every 10 seconds. HTTP 429 pauses a source for at
   least five minutes.
+- `system` sources are sampled on a thread of their own every 2 seconds and
+  are never cached.
 - Last values are cached in `%LOCALAPPDATA%\Limitbar\state.json` (no secrets),
   so the widget shows numbers immediately after a restart and an idle account
   keeps its last values, rolling a window to 0% when its reset time passes.

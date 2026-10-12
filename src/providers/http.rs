@@ -125,7 +125,13 @@ fn map(spec: &HttpSpec, v: &Value, now: i64) -> Result<Reading, Outcome> {
             r.add(&w.key, win);
         }
         if w.tag.is_some() || w.name.is_some() || w.unit.is_some() {
-            r.labels.push(Label { key: w.key.clone(), tag: w.tag.clone(), name: w.name.clone(), unit: w.unit.clone() });
+            r.labels.push(Label {
+                key: w.key.clone(),
+                tag: w.tag.clone(),
+                name: w.name.clone(),
+                unit: w.unit.clone(),
+                ..Default::default()
+            });
         }
     }
     if r.windows.is_empty() {

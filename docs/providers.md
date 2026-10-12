@@ -1,13 +1,15 @@
 # Providers
 
 A *source* is one block on the taskbar. Its *provider* is where the numbers
-come from. Limitbar has four built-in providers and three generic ones that
-let you add any service, script or file without rebuilding anything.
+come from. Limitbar has four built-in providers, three generic ones that
+let you add any service, script or file without rebuilding anything, and one
+that measures the PC itself.
 
 - [Built-in providers](#built-in-providers): Claude, Codex, Grok, Cursor
 - [`http`](#http): call any JSON endpoint and map fields to bars
 - [`command`](#command): run any program that prints Limitbar's JSON
 - [`file`](#file): read Limitbar's JSON from a file another tool writes
+- [`system`](#system): this PC's CPU, memory, GPU, disk and network load, and the processes using them
 - [Examples](#examples)
 - [Adding a built-in provider](../CONTRIBUTING.md#adding-a-built-in-provider)
 
@@ -185,6 +187,54 @@ ten minutes).
 
 Write the file atomically (write a temporary file, then rename it) so Limitbar
 never reads half of it.
+
+## system
+
+This PC's live load, the numbers at the top of Task Manager's **Processes**
+tab, with the busiest processes in the tooltip. It is off until you add it:
+
+```jsonc
+"sources": [
+  "auto",
+  { "provider": "system" }                                   // PC: cpu, mem, gpu
+]
+```
+
+Each metric is one bar, so one source shows up to three. Add a second source
+for the others:
+
+```jsonc
+{ "provider": "system", "bars": ["cpu", "memory", "gpu"] },
+{ "provider": "system", "label": "IO", "bars": ["disk", "network"] }
+```
+
+| Metric | Bar | Measured as | Tooltip |
+|---|---|---|---|
+| `cpu` | `cpu` | `% Processor Time` over all cores (what Task Manager's Processes tab shows) | busiest processes by CPU share |
+| `memory` | `mem` | physical memory in use (total minus available) | used and total GB; busiest processes by private working set |
+| `gpu` | `gpu` | the busiest GPU engine, each engine's use summed over processes, as Task Manager computes it | that engine's type (3D, Copy, Video…); busiest processes on their busiest engine |
+| `disk` | `disk` | active time averaged over the physical disks | throughput and the busiest disk; processes with the most file and device I/O |
+| `network` | `net` | the busiest adapter's throughput against its link speed | Mbps of link speed; adapter name |
+
+Processes with the same name are added up and counted, as Task Manager groups
+them: `chrome (18) 1.4 GB`. Per-process network use needs event tracing, so
+the network tooltip names the adapter instead. The per-process I/O figure
+counts every read and write, including files served from the cache and pipes,
+so it can be higher than the disk throughput.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `bars` | `["cpu", "memory", "gpu"]` | Metrics to show, up to three: `cpu`, `memory`, `gpu`, `disk`, `network`. |
+| `poll_seconds` | `2` | Seconds between samples, 1 to 60. The figures are averages over that time, like Task Manager's. |
+| `top` | `3` | Busiest processes listed per metric in the tooltip; `0` for none (and no process scan). |
+| `label`, `name`, `color` | `PC`, `This PC`, sky blue | As for any source. |
+
+The figures come from Windows performance counters (PDH, by their English
+names, so any display language works) and one process-list query per sample.
+Only the metrics you show are measured, sampling stops with the widget, and
+nothing is written to disk. With the default three metrics Limitbar uses about
+half a percent of one CPU core. The right-click menu gains **Open Task
+Manager**.
 
 ## Examples
 

@@ -1,5 +1,6 @@
 //! Limitbar: a tiny widget docked inside the Windows 11 taskbar that shows
-//! how much of your AI plan limits (or any other quota) you have used.
+//! how much of your AI plan limits (or any other quota) you have used, and
+//! optionally this PC's CPU, memory, GPU, disk and network load.
 //!
 //! The widget is a per-pixel-alpha layered child window of `Shell_TrayWnd`, so
 //! it follows the taskbar through auto-hide, full-screen apps and moves. A
@@ -20,6 +21,7 @@ mod net;
 mod providers;
 mod render;
 mod sys;
+mod system;
 mod time;
 mod usage;
 mod worker;
@@ -41,7 +43,7 @@ use config::{Config, Palette, Position, Provider, Source, ThemeMode};
 use providers::{Outcome, Profile};
 use render::{Align, Font, Painter, Rgba, Surface};
 use usage::Reading;
-use worker::{Update, WM_APP_ROUND_DONE, WM_APP_UPDATE, Worker};
+use worker::{Polled, Update, WM_APP_ROUND_DONE, WM_APP_UPDATE, Worker};
 
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -186,14 +188,16 @@ fn build_views(cfg: &Config, previous: Vec<View>) -> Vec<View> {
 
 /// Polls every real source (not the placeholder) of `views`.
 fn spawn_worker(views: &[View], generation: u64, host: HWND) -> Worker {
-    let polled: Vec<(Source, Option<Reading>)> =
-        views.iter().filter(|v| !v.src.id.is_empty()).map(|v| (v.src.clone(), v.reading.clone())).collect();
-    let (sources, cached) = polled.into_iter().unzip();
-    worker::spawn(generation, sources, cached, host as isize)
+    let real = views.iter().enumerate().filter(|(_, v)| !v.src.id.is_empty());
+    let (system, polled): (Vec<_>, Vec<_>) = real.partition(|(_, v)| v.src.is_system());
+    let polled = polled.into_iter().map(|(idx, v)| Polled { idx, src: v.src.clone(), cached: v.reading.clone() }).collect();
+    let system = system.into_iter().map(|(idx, v)| (idx, v.src.clone())).collect();
+    worker::spawn(generation, polled, system, host as isize)
 }
 
+/// Seconds after which a reading is drawn faded as out of date.
 fn stale_after(src: &Source) -> i64 {
-    (src.poll_seconds as i64 * 3).max(600)
+    if src.is_system() { (src.poll_seconds as i64 * 5).max(10) } else { (src.poll_seconds as i64 * 3).max(600) }
 }
 
 fn severity(used: f64, accent: Rgba, cfg: &Config, p: &Palette) -> (Rgba, Rgba) {
@@ -434,7 +438,7 @@ impl App {
             let old = v.reading.as_ref().is_some_and(|r| now - r.fetched_at > stale_after(&v.src));
             let fade = if old {
                 0.5
-            } else if refreshing {
+            } else if refreshing && !v.src.is_system() {
                 0.7
             } else {
                 1.0
@@ -489,16 +493,24 @@ impl App {
         }
         lines.push(head);
         let remaining = self.cfg.appearance.show_remaining;
-        for (_, name, w, unit) in display::tooltip_windows(&v.src, v.reading.as_ref()) {
-            lines.push(display::window_line(&name, w, unit.as_deref(), now, remaining, sys::day_clock));
+        let system = v.src.is_system();
+        for e in display::tooltip_windows(&v.src, v.reading.as_ref()) {
+            lines.push(display::window_line(&e, now, remaining, sys::day_clock));
+            if let Some(d) = &e.detail {
+                lines.push(format!("      {d}"));
+            }
         }
         if let Some(r) = &v.reading {
             if let Some(note) = &r.note {
                 lines.push(note.clone());
             }
-            lines.push(format!("Updated {}", sys::day_clock(r.fetched_at, now)));
+            // Live load needs no timestamp unless it stopped updating.
+            if !system || now - r.fetched_at > stale_after(&v.src) {
+                lines.push(format!("Updated {}", sys::day_clock(r.fetched_at, now)));
+            }
         }
         match &v.status {
+            Status::Waiting if system => lines.push("Measuring\u{2026}".into()),
             Status::Waiting => lines.push("Checking usage\u{2026}".into()),
             Status::Live => {}
             Status::Idle(msg) => lines.push(msg.clone()),
@@ -574,8 +586,7 @@ impl App {
         if u.generation != self.worker.generation {
             return;
         }
-        // The worker only knows the polled sources, which are the views in order.
-        let Some(v) = self.views.iter_mut().filter(|v| !v.src.id.is_empty()).nth(u.idx) else { return };
+        let Some(v) = self.views.get_mut(u.idx) else { return };
         v.status = match u.outcome {
             Outcome::Fresh(r) => {
                 v.reading = Some(r);
@@ -591,12 +602,17 @@ impl App {
     fn pages(&self) -> Vec<(String, String)> {
         let mut pages: Vec<(String, String)> = Vec::new();
         for v in &self.views {
-            let Some(url) = &v.src.url else { continue };
-            if pages.iter().any(|(_, u)| u == url) {
-                continue;
+            let page = match (&v.src.url, v.src.is_system()) {
+                (Some(url), _) => {
+                    let title = v.src.builtin().map_or_else(|| v.src.name.clone(), |b| b.title().to_owned());
+                    (format!("Open {title} usage page"), url.clone())
+                }
+                (None, true) => ("Open Task Manager".to_owned(), "taskmgr.exe".to_owned()),
+                (None, false) => continue,
+            };
+            if !pages.iter().any(|(_, u)| *u == page.1) {
+                pages.push(page);
             }
-            let title = v.src.builtin().map_or_else(|| v.src.name.clone(), |b| b.title().to_owned());
-            pages.push((format!("Open {title} usage page"), url.clone()));
         }
         pages
     }
@@ -832,22 +848,30 @@ fn attach_console() {
     }
 }
 
+/// `println!` that ignores a closed pipe (`limitbar --probe | Select -First 3`).
+macro_rules! out {
+    ($($arg:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(std::io::stdout(), $($arg)*);
+    }};
+}
+
 /// `limitbar --probe`: checks every configured source once, prints one line
 /// per source (label, windows, reset times, plan, provider note) and exits.
 /// Never prints tokens or account names and does not touch the cache or a
 /// running instance. Exit code 1 if any source failed.
 fn probe() -> i32 {
     let cfg = config::load();
-    println!("Settings: {}{}", config::config_path().display(), if config::stamp().is_some() { "" } else { " (not present: defaults)" });
+    out!("Settings: {}{}", config::config_path().display(), if config::stamp().is_some() { "" } else { " (not present: defaults)" });
     for w in &cfg.warnings {
-        println!("  warning: {w}");
+        out!("  warning: {w}");
     }
     let Some(http) = net::Http::new(providers::user_agent()) else {
-        println!("WinHTTP is unavailable");
+        out!("WinHTTP is unavailable");
         return 1;
     };
     if cfg.sources.is_empty() {
-        println!("No sources: {NO_SOURCES}");
+        out!("No sources: {NO_SOURCES}");
         return 1;
     }
     let width = cfg.sources.iter().map(|s| s.name.chars().count()).max().unwrap_or(0).max(8) + 2;
@@ -859,10 +883,17 @@ fn probe() -> i32 {
             Outcome::Fresh(r) => {
                 let mut parts: Vec<String> = display::tooltip_windows(src, Some(r))
                     .into_iter()
-                    .map(|(k, _, w, _)| {
-                        let bar = src.bars.iter().find(|b| b.keys.contains(&k));
-                        let tag = display::tag(&k, bar, Some(r));
-                        match w {
+                    .map(|e| {
+                        let bar = src.bars.iter().find(|b| b.keys.contains(&e.key));
+                        let tag = display::tag(&e.key, bar, Some(r));
+                        match e.window {
+                            Some(w) if src.is_system() => {
+                                let amounts = match (w.value, w.limit, &e.unit) {
+                                    (Some(v), Some(l), Some(u)) => format!(" ({v} of {l} {u})"),
+                                    _ => String::new(),
+                                };
+                                format!("{tag} {:.1}%{amounts}", w.used)
+                            }
                             Some(w) if w.resets_at > 0 => format!(
                                 "{tag} {:.1}% (resets {}, in {})",
                                 w.used,
@@ -885,7 +916,18 @@ fn probe() -> i32 {
             }
             Outcome::Limited(until) => format!("429    throttled until {}", sys::clock(*until)),
         };
-        println!("{:<5}{:<width$}{detail}", src.label, src.name);
+        out!("{:<5}{:<width$}{detail}", src.label, src.name);
+        // The busiest processes and other details a system source shows in its tooltip.
+        if let Outcome::Fresh(r) = &outcome
+            && src.is_system()
+        {
+            for e in display::tooltip_windows(src, Some(r)) {
+                let tag = display::tag(&e.key, src.bars.iter().find(|b| b.keys.contains(&e.key)), Some(r));
+                for extra in [&e.info, &e.detail].into_iter().flatten() {
+                    out!("{:<5}{:<width$}       {tag}: {extra}", "", "");
+                }
+            }
+        }
     }
     i32::from(failed)
 }

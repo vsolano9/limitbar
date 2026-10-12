@@ -11,12 +11,16 @@ use serde_json::Value;
 
 use crate::jsonc;
 use crate::render::{Rgba, rgba};
+use crate::system;
 use crate::usage::{CURSOR_API, CURSOR_AUTO, DAILY, FIVE_HOUR, MONTHLY, WEEKLY};
 
 pub const MIN_POLL: u64 = 60;
 /// Custom providers may poll faster (a local script or file costs nothing).
 pub const MIN_POLL_CUSTOM: u64 = 15;
 const DEFAULT_POLL: u64 = 120;
+/// `system` sources sample this often by default, and at most once a second.
+const SYSTEM_POLL: u64 = 2;
+const SYSTEM_TOP: usize = 3;
 /// Rows that fit in the taskbar's height.
 pub const MAX_BARS: usize = 3;
 pub const SCHEMA_URL: &str = "https://raw.githubusercontent.com/vsolano9/limitbar/main/limitbar.schema.json";
@@ -124,6 +128,9 @@ const PALETTE: [ColorPair; 6] = [
     ColorPair { dark: rgba(232, 214, 150, 1.0), light: rgba(128, 104, 32, 1.0) },
 ];
 
+/// `system` sources: the PC's own load.
+const SYSTEM_COLOR: ColorPair = ColorPair { dark: rgba(116, 200, 252, 1.0), light: rgba(0, 110, 190, 1.0) };
+
 // ---------------------------------------------------------------- model
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -207,10 +214,23 @@ pub struct HttpSpec {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Provider {
-    Builtin { kind: Builtin, dir: PathBuf },
+    Builtin {
+        kind: Builtin,
+        dir: PathBuf,
+    },
     Http(Box<HttpSpec>),
-    Command { line: CommandLine, timeout: u64 },
-    File { path: PathBuf },
+    Command {
+        line: CommandLine,
+        timeout: u64,
+    },
+    File {
+        path: PathBuf,
+    },
+    /// This PC's live load; the metrics are the source's bar keys. `top`
+    /// processes are listed per metric in the tooltip.
+    System {
+        top: usize,
+    },
 }
 
 /// One taskbar row: the first of `keys` the reading has, with optional
@@ -251,6 +271,20 @@ impl Source {
             Provider::Builtin { kind, .. } => Some(kind),
             _ => None,
         }
+    }
+
+    pub fn is_system(&self) -> bool {
+        matches!(self.provider, Provider::System { .. })
+    }
+
+    /// Processes a `system` source lists per metric (0 for other sources).
+    pub fn system_top(&self) -> usize {
+        if let Provider::System { top } = self.provider { top } else { 0 }
+    }
+
+    /// The metrics a `system` source samples: its bar keys.
+    pub fn metrics(&self) -> Vec<String> {
+        self.bars.iter().flat_map(|b| b.keys.iter().cloned()).collect()
     }
 }
 
@@ -689,16 +723,21 @@ impl Parser<'_> {
                     };
                     Provider::File { path: expand_path(p, self.home) }
                 }
+                "system" => Provider::System { top: v.get("top").and_then(Value::as_u64).map_or(SYSTEM_TOP, |n| n.min(10) as usize) },
                 other => {
                     self.warn(format!(
-                        "{what}: unknown provider \"{other}\" (expected claude, codex, grok, cursor, http, command or file)"
+                        "{what}: unknown provider \"{other}\" (expected claude, codex, grok, cursor, http, command, file or system)"
                     ));
                     return None;
                 }
             };
-            let fallback = given_name.or(given_label).unwrap_or("Custom");
-            let label: String = fallback.chars().filter(|c| c.is_alphanumeric()).take(2).collect::<String>().to_uppercase();
-            (provider, if label.is_empty() { "??".into() } else { label }, fallback.to_owned())
+            if matches!(provider, Provider::System { .. }) {
+                (provider, "PC".to_owned(), "This PC".to_owned())
+            } else {
+                let fallback = given_name.or(given_label).unwrap_or("Custom");
+                let label: String = fallback.chars().filter(|c| c.is_alphanumeric()).take(2).collect::<String>().to_uppercase();
+                (provider, if label.is_empty() { "??".into() } else { label }, fallback.to_owned())
+            }
         };
         let label = given_label.map_or(def_label, str::to_owned);
         // As in 1.x, a missing name falls back to the given label (this keeps cache ids stable).
@@ -716,8 +755,23 @@ impl Parser<'_> {
                 .take(MAX_BARS)
                 .map(|w| Bar { keys: vec![w.key.clone()], tag: w.tag.clone(), name: w.name.clone(), unit: w.unit.clone() })
                 .collect(),
+            (Provider::System { .. }, _) => [system::CPU, system::MEMORY, system::GPU].into_iter().map(Bar::key).collect(),
             _ => Vec::new(),
         });
+        if let Provider::System { .. } = provider {
+            for bar in &mut bars {
+                let (known, unknown): (Vec<String>, Vec<String>) = bar.keys.drain(..).partition(|k| system::METRICS.contains(&k.as_str()));
+                for k in unknown {
+                    self.warn(format!("{what}: \"{k}\" is not a system metric (cpu, memory, gpu, disk or network)"));
+                }
+                bar.keys = known;
+            }
+            bars.retain(|b| !b.keys.is_empty());
+            if bars.is_empty() {
+                self.warn(format!("{what}: a system source needs at least one of cpu, memory, gpu, disk or network in \"bars\""));
+                return None;
+            }
+        }
         // Display overrides from an http window apply to bars that name it.
         if let Provider::Http(h) = &provider {
             for bar in &mut bars {
@@ -728,16 +782,23 @@ impl Parser<'_> {
                 }
             }
         }
+        let system = matches!(provider, Provider::System { .. });
         let color = self.color_pair(v.get("color"), &what).unwrap_or_else(|| match builtin {
             Some(kind) => kind.color(),
+            None if system => SYSTEM_COLOR,
             None => {
                 let c = PALETTE[*palette_next % PALETTE.len()];
                 *palette_next += 1;
                 c
             }
         });
-        let min = if builtin.is_some() { MIN_POLL } else { MIN_POLL_CUSTOM };
-        let poll_seconds = v.get("poll_seconds").and_then(Value::as_u64).unwrap_or(default_poll).max(min);
+        let given_poll = v.get("poll_seconds").and_then(Value::as_u64);
+        let poll_seconds = if system {
+            // Its own scale: the global poll_seconds is about usage endpoints.
+            given_poll.unwrap_or(SYSTEM_POLL).clamp(1, 60)
+        } else {
+            given_poll.unwrap_or(default_poll).max(if builtin.is_some() { MIN_POLL } else { MIN_POLL_CUSTOM })
+        };
         let url = string_of(v, "page").or_else(|| builtin.map(|k| k.usage_url().to_owned()));
         Some(Source { id, label, name, provider, bars, color, url, poll_seconds })
     }
@@ -920,7 +981,12 @@ const STARTER: &str = r#"{
   // "enabled": false to hide it. Add http, command and file providers for
   // anything else (examples: docs/providers.md).
   "sources": [
-    "auto"
+    "auto",
+
+    // This PC's live load, like Task Manager: up to three of cpu, memory,
+    // gpu, disk and network per entry, busiest processes in the tooltip.
+    // Set "enabled" to true to show it.
+    { "provider": "system", "bars": ["cpu", "memory", "gpu"], "enabled": false }
   ],
 
   "appearance": {
@@ -1113,11 +1179,13 @@ mod tests {
 
     #[test]
     fn example_file_parses_without_warnings() {
+        // The example lists "auto": keep this session's own Claude login out of it.
+        unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR") };
         let text = include_str!("../examples/config.example.jsonc");
         let v: Value = serde_json::from_str(&jsonc::strip(text)).unwrap();
         let c = from_json(Some(&v), Path::new("Z:/nobody"), Path::new("Z:/nobody/a"));
         assert!(c.warnings.is_empty(), "{:?}", c.warnings);
-        assert_eq!(labels(&c.sources), ["GPT", "CW", "GH", "OR", "C:", "CI"]);
+        assert_eq!(labels(&c.sources), ["GPT", "CW", "GH", "OR", "C:", "CI", "PC", "IO"]);
     }
 
     #[test]
