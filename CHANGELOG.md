@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `install.ps1` starts Limitbar through Explorer, so the widget keeps running after the terminal or agent tool that ran the script closes. Some hosts run scripts in a job object that ends every child process with it.
+
 ## 2.1.0 - 2026-10-12
 
 - **This PC's load**: a new `system` provider shows CPU, memory, GPU, disk and network use as Task Manager's Processes tab reports them, sampled every 2 seconds (`poll_seconds`, 1 to 60). It is optional: add `{ "provider": "system" }` to `sources` for a `PC` block with `cpu`, `mem` and `gpu`, or pick up to three metrics per source with `bars`.

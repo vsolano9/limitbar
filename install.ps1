@@ -53,5 +53,10 @@ if ($NoStartup) {
 } else {
     Set-ItemProperty -Path $runKey -Name Limitbar -Value "`"$installed`""
 }
-Start-Process $installed
+# Started through Explorer so the widget outlives this shell: terminals and agent
+# tools can run scripts in a job object that kills every child when it closes.
+Start-Process explorer.exe -ArgumentList "`"$installed`""
+$deadline = (Get-Date).AddSeconds(10)
+while (-not (Get-Process limitbar -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+if (-not (Get-Process limitbar -ErrorAction SilentlyContinue)) { Start-Process $installed }
 Write-Host "Limitbar installed to $installed and started."
