@@ -17,21 +17,23 @@ to accept.
   an `http` mapping (for example, it needs logic like reading a CLI's token
   store or classifying windows).
 
-## Build and test
+## Build and run
 
 Requires Rust (MSVC toolchain, edition 2024) and the Windows SDK resource
 compiler, on Windows.
 
 ```powershell
-cargo test
 cargo clippy --all-targets
 cargo build --release      # target\release\limitbar.exe
 .\install.ps1              # build and install for the current user
 ```
 
-There is no CI; run the tests and clippy locally before opening a pull request.
+There is no CI; before opening a pull request, build the app, run it and use the
+changed feature once, then report what you saw in the pull request.
 `limitbar --probe` exercises every configured source against the real
 endpoints; do not run it in a loop, the providers rate-limit per sign-in.
+
+No testing (Victor, 2026-10-23, permanent): agents never run the test suite (a hook blocks test runners).
 
 `tools/make_icon.py` (Python with Pillow) regenerates `res/limitbar.ico`.
 
