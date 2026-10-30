@@ -1,6 +1,6 @@
 [package]
 name = "limitbar"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2024"
 description = "Tiny Windows 11 taskbar widget for AI plan usage limits (Claude, Codex, Grok, Cursor), any provider you add, and your PC's CPU, memory and GPU load"
 publish = false

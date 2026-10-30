@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.2.0 - 2026-10-30
 
+- **Claude's new plan names**: Anthropic renamed Max 20x to Ultra and Max 5x to Max on 2026-10-30, so the tooltip and `--probe` now say `Ultra` and `Max` (also for a future `ultra` tier or subscription type).
+- **No 5-hour bar where there is no 5-hour limit**: Ultra loses the 5-hour limit, account by account. A Claude source with the default bars now draws only `wk` once its reading has no 5-hour window, and the tooltip leaves it out; accounts that still have the limit keep both bars. Bars you list yourself in `bars` are drawn as configured.
 - `install.ps1` starts Limitbar through Explorer, so the widget keeps running after the terminal or agent tool that ran the script closes. Some hosts run scripts in a job object that ends every child process with it.
 
 ## 2.1.0 - 2026-10-12

@@ -78,13 +78,14 @@ impl Builtin {
 
     /// Rows drawn on the taskbar, top to bottom. Each row shows the first of
     /// its keys the reading has (Grok reports one period whose length the
-    /// server decides).
-    fn default_bars(self) -> &'static [&'static [&'static str]] {
+    /// server decides). `true` marks an optional row: Claude's 5-hour window
+    /// is gone on Ultra (Anthropic, 2026-10-30).
+    fn default_bars(self) -> &'static [(&'static [&'static str], bool)] {
         match self {
-            Builtin::Claude => &[&[FIVE_HOUR], &[WEEKLY]],
-            Builtin::Codex => &[&[WEEKLY]],
-            Builtin::Grok => &[&[WEEKLY, MONTHLY, DAILY]],
-            Builtin::Cursor => &[&[CURSOR_AUTO], &[CURSOR_API]],
+            Builtin::Claude => &[(&[FIVE_HOUR], true), (&[WEEKLY], false)],
+            Builtin::Codex => &[(&[WEEKLY], false)],
+            Builtin::Grok => &[(&[WEEKLY, MONTHLY, DAILY], false)],
+            Builtin::Cursor => &[(&[CURSOR_AUTO], false), (&[CURSOR_API], false)],
         }
     }
 
@@ -234,18 +235,20 @@ pub enum Provider {
 }
 
 /// One taskbar row: the first of `keys` the reading has, with optional
-/// display overrides.
+/// display overrides. An `optional` row (built-in defaults only) is left out
+/// while the reading has none of its keys.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Bar {
     pub keys: Vec<String>,
     pub tag: Option<String>,
     pub name: Option<String>,
     pub unit: Option<String>,
+    pub optional: bool,
 }
 
 impl Bar {
     fn key(k: &str) -> Bar {
-        Bar { keys: vec![k.to_owned()], tag: None, name: None, unit: None }
+        Bar { keys: vec![k.to_owned()], tag: None, name: None, unit: None, optional: false }
     }
 }
 
@@ -433,7 +436,13 @@ fn builtin_source(kind: Builtin, id: String, label: String, name: String, dir: P
         bars: kind
             .default_bars()
             .iter()
-            .map(|keys| Bar { keys: keys.iter().map(|k| (*k).to_owned()).collect(), tag: None, name: None, unit: None })
+            .map(|(keys, optional)| Bar {
+                keys: keys.iter().map(|k| (*k).to_owned()).collect(),
+                tag: None,
+                name: None,
+                unit: None,
+                optional: *optional,
+            })
             .collect(),
         color: kind.color(),
         url: Some(kind.usage_url().to_owned()),
@@ -680,6 +689,7 @@ impl Parser<'_> {
                         tag: string_of(b, "tag"),
                         name: string_of(b, "name"),
                         unit: string_of(b, "unit"),
+                        optional: false,
                     })
                 }
                 _ => None,
@@ -753,7 +763,13 @@ impl Parser<'_> {
                 .windows
                 .iter()
                 .take(MAX_BARS)
-                .map(|w| Bar { keys: vec![w.key.clone()], tag: w.tag.clone(), name: w.name.clone(), unit: w.unit.clone() })
+                .map(|w| Bar {
+                    keys: vec![w.key.clone()],
+                    tag: w.tag.clone(),
+                    name: w.name.clone(),
+                    unit: w.unit.clone(),
+                    optional: false,
+                })
                 .collect(),
             (Provider::System { .. }, _) => [system::CPU, system::MEMORY, system::GPU].into_iter().map(Bar::key).collect(),
             _ => Vec::new(),

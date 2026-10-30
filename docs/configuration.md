@@ -91,7 +91,7 @@ and, usually, a reset time. Each has a key:
 
 | Key | Tag | Where it comes from |
 |---|---|---|
-| `five_hour` | `5h` | Claude, Codex (plans with a 5-hour window) |
+| `five_hour` | `5h` | Claude, Codex (plans with a 5-hour window; not Claude Ultra) |
 | `daily` | `day` | Grok (when the server reports a daily period) |
 | `weekly` | `wk` | Claude, Codex, Grok |
 | `monthly` | `mo` | Grok (when the server reports a monthly period) |
@@ -114,7 +114,8 @@ Custom providers use whatever keys they define.
 { "provider": "claude", "bars": [{ "key": "weekly", "tag": "7d" }, "five_hour"] }
 ```
 
-Built-ins default to their usual rows (Claude: `5h` and `wk`; Codex: `wk`;
+Built-ins default to their usual rows (Claude: `5h`, while the plan has a
+5-hour window, and `wk`; Codex: `wk`;
 Grok: its credit period; Cursor: `cur` and `api`; system: `cpu`, `mem` and
 `gpu`). `http` sources default to
 their `windows`; `command` and `file` sources without `bars` draw the first

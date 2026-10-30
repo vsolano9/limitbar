@@ -1,4 +1,5 @@
-//! Claude (Claude Code subscription sign-in): 5-hour and weekly windows.
+//! Claude (Claude Code subscription sign-in): the weekly window, plus the
+//! 5-hour window on plans that still have one (Ultra drops it, 2026-10-30).
 //!
 //! Credentials: `<config dir>\.credentials.json` (`claudeAiOauth.accessToken`,
 //! `expiresAt` in ms). Endpoint: `GET api.anthropic.com/api/oauth/usage`.
@@ -69,10 +70,11 @@ fn parse(v: &Value, now: i64) -> Option<Reading> {
     (!r.windows.is_empty()).then_some(r)
 }
 
-/// `default_claude_max_20x` -> `Max 20x`; falls back to the subscription type.
+/// `default_claude_max_20x` -> `Ultra` (Anthropic renamed Max 20x to Ultra and
+/// Max 5x to Max on 2026-10-30); falls back to the subscription type.
 fn plan(rate_limit_tier: Option<&str>, subscription: Option<&str>) -> Option<String> {
     if let Some(t) = rate_limit_tier {
-        for (key, name) in [("max_20x", "Max 20x"), ("max_5x", "Max 5x")] {
+        for (key, name) in [("ultra", "Ultra"), ("max_20x", "Ultra"), ("max_5x", "Max")] {
             if t.contains(key) {
                 return Some(name.into());
             }
@@ -120,7 +122,9 @@ mod tests {
 
     #[test]
     fn plans() {
-        assert_eq!(plan(Some("default_claude_max_20x"), Some("max")).as_deref(), Some("Max 20x"));
+        assert_eq!(plan(Some("default_claude_max_20x"), Some("max")).as_deref(), Some("Ultra"));
+        assert_eq!(plan(Some("default_claude_max_5x"), Some("max")).as_deref(), Some("Max"));
+        assert_eq!(plan(None, Some("ultra")).as_deref(), Some("Ultra"));
         assert_eq!(plan(None, Some("pro")).as_deref(), Some("Pro"));
         assert_eq!(plan(None, None), None);
     }

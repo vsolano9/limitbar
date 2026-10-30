@@ -32,7 +32,7 @@ endpoint can change without notice.
 
 | Provider | Windows | Credentials | Endpoint |
 |---|---|---|---|
-| `claude` (Claude Code, Pro/Max sign-in) | `five_hour`, `weekly` | `<dir>\.credentials.json` (`claudeAiOauth.accessToken`); account from `<dir>\.claude.json` | `GET https://api.anthropic.com/api/oauth/usage` |
+| `claude` (Claude Code, Pro/Max/Ultra sign-in) | `weekly`, plus `five_hour` on plans that have one (Ultra has none once Anthropic lifts it for the account) | `<dir>\.credentials.json` (`claudeAiOauth.accessToken`); account from `<dir>\.claude.json` | `GET https://api.anthropic.com/api/oauth/usage` |
 | `codex` (Codex CLI, ChatGPT sign-in) | `weekly`, plus `five_hour` on plans that have one | `<dir>\auth.json` (`tokens.access_token`, `tokens.account_id`) | `GET https://chatgpt.com/backend-api/wham/usage` |
 | `grok` (Grok Build CLI) | the credit period: `weekly`, `monthly` or `daily` | `<dir>\auth.json`, first `https://auth.x.ai::<id>` entry | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits`; plan from `/v1/settings` |
 | `cursor` (Cursor Agent CLI) | `auto` (Cursor models), `api` (other models) | `<dir>\auth.json` (`accessToken`); account from `~\.cursor\cli-config.json` | `POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage`; plan from `GetPlanInfo` |

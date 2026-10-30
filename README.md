@@ -109,7 +109,7 @@ limitbar --probe
 
 ```
 Settings: C:\Users\me\AppData\Roaming\Limitbar\config.json
-C1   Claude 1     ok     5h 4.0% (resets 4:30 PM, in 3h 17m) | wk 89.0% (resets Tue 9:00 PM, in 4d 7h) | plan Max 20x
+C1   Claude 1     ok     5h 4.0% (resets 4:30 PM, in 3h 17m) | wk 89.0% (resets Tue 9:00 PM, in 4d 7h) | plan Ultra
 CX   Codex        ok     wk 100.0% (resets Wed 5:51 AM, in 4d 16h) | plan Pro
 GH   GitHub API   ok     api 0.1% (resets 2:13 PM, in 1h 00m) | srch 0.0% (resets 1:14 PM, in 1m)
 PC   This PC      ok     cpu 48.7% | mem 78.0% (24.9 of 31.9 GB) | gpu 49.3%

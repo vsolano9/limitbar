@@ -14,15 +14,19 @@ pub struct Row<'a> {
 
 /// The bars a source draws. Sources without configured bars show the first
 /// windows their provider reported, or a single empty row before any data.
+/// An optional bar the reading doesn't report is left out.
 pub fn rows<'a>(src: &'a Source, reading: Option<&Reading>) -> Vec<Row<'a>> {
     if !src.bars.is_empty() {
         return src
             .bars
             .iter()
-            .map(|bar| {
+            .filter_map(|bar| {
                 let found = bar.keys.iter().find_map(|k| Some((k.clone(), reading?.get(k)?)));
+                if found.is_none() && bar.optional && reading.is_some() {
+                    return None;
+                }
                 let (key, window) = found.map_or_else(|| (bar.keys[0].clone(), None), |(k, w)| (k, Some(w)));
-                Row { key, window, bar: Some(bar) }
+                Some(Row { key, window, bar: Some(bar) })
             })
             .collect();
     }
