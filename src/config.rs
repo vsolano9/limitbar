@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::jsonc;
 use crate::render::{Rgba, rgba};
 use crate::system;
-use crate::usage::{CURSOR_API, CURSOR_AUTO, DAILY, FIVE_HOUR, MONTHLY, WEEKLY};
+use crate::usage::{CURSOR_API, CURSOR_AUTO, DAILY, FABLE, FIVE_HOUR, MONTHLY, WEEKLY};
 
 pub const MIN_POLL: u64 = 60;
 /// Custom providers may poll faster (a local script or file costs nothing).
@@ -79,10 +79,11 @@ impl Builtin {
     /// Rows drawn on the taskbar, top to bottom. Each row shows the first of
     /// its keys the reading has (Grok reports one period whose length the
     /// server decides). `true` marks an optional row: Claude's 5-hour window
-    /// is gone on Ultra (Anthropic, 2026-10-30).
+    /// is gone on Ultra (Anthropic, 2026-10-30), and the Fable share exists
+    /// only where the plan includes Fable (2026-11-09).
     fn default_bars(self) -> &'static [(&'static [&'static str], bool)] {
         match self {
-            Builtin::Claude => &[(&[FIVE_HOUR], true), (&[WEEKLY], false)],
+            Builtin::Claude => &[(&[FIVE_HOUR], true), (&[WEEKLY], false), (&[FABLE], true)],
             Builtin::Codex => &[(&[WEEKLY], false)],
             Builtin::Grok => &[(&[WEEKLY, MONTHLY, DAILY], false)],
             Builtin::Cursor => &[(&[CURSOR_AUTO], false), (&[CURSOR_API], false)],
@@ -1061,7 +1062,9 @@ mod tests {
         assert_eq!(ids, ["claude1", "claude2", "codex", "grok", "cursor"]);
         assert_eq!(s[1].name, "Claude 2");
         assert_eq!(s[4].provider, Provider::Builtin { kind: Builtin::Cursor, dir: appdata.join("Cursor") });
-        assert_eq!(s[0].bars.len(), 2);
+        assert_eq!(s[0].bars.len(), 3); // 5h (optional), wk, fab (optional)
+        assert_eq!(s[0].bars[2].keys, [FABLE]);
+        assert!(s[0].bars[2].optional);
         assert_eq!(s[3].bars[0].keys, [WEEKLY, MONTHLY, DAILY]);
         assert_eq!(s[2].url.as_deref(), Some("https://chatgpt.com/codex/settings/usage"));
         // Signed out of Grok and Cursor: neither is shown.

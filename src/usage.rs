@@ -15,6 +15,9 @@ pub const FIVE_HOUR: &str = "five_hour";
 pub const DAILY: &str = "daily";
 pub const WEEKLY: &str = "weekly";
 pub const MONTHLY: &str = "monthly";
+/// Claude's included Fable share: the percent used of the part of the weekly
+/// limit Fable models may draw (half of it on Max and Ultra, 2026-11).
+pub const FABLE: &str = "fable";
 /// Cursor's own models (Auto + Composer pool).
 pub const CURSOR_AUTO: &str = "auto";
 /// Named third-party models in Cursor (Claude, GPT, Gemini, ...).
@@ -26,6 +29,7 @@ const NAMES: &[(&str, &str, &str)] = &[
     (FIVE_HOUR, "5h", "5-hour"),
     (DAILY, "day", "Daily"),
     (WEEKLY, "wk", "Weekly"),
+    (FABLE, "fab", "Fable share of weekly"),
     (MONTHLY, "mo", "Monthly"),
     (CURSOR_AUTO, "cur", "Cursor models (Auto + Composer)"),
     (CURSOR_API, "api", "Other models (API)"),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 - 2026-11-09
+
+- **Claude's Fable share**: Max and Ultra include Fable models up to half of the weekly limit. Claude sources now draw a `fab` row with the percent of that share used (and its reset) beside `wk`, and the tooltip and `--probe` list it. It appears only where Anthropic reports the share, and the cached state keeps it under the key `fable` for scripts that read Limitbar's state.
+- **Codex models with their own limit**: when the Codex usage report marks a model (such as GPT-6 Astra) unavailable, the Codex tooltip and `--probe` say so.
+
 ## 2.2.0 - 2026-10-30
 
 - **Claude's new plan names**: Anthropic renamed Max 20x to Ultra and Max 5x to Max on 2026-10-30, so the tooltip and `--probe` now say `Ultra` and `Max` (also for a future `ultra` tier or subscription type).

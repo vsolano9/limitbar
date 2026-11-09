@@ -11,7 +11,7 @@ use serde_json::Value;
 use super::{Outcome, Profile, expired, json_body, now, read_json};
 use crate::net::Http;
 use crate::time::parse_iso8601;
-use crate::usage::{FIVE_HOUR, Reading, WEEKLY, Window, title_case};
+use crate::usage::{FABLE, FIVE_HOUR, Reading, WEEKLY, Window, title_case};
 
 const IDLE: &str = "Sign-in token expired (account idle). Showing the last values; resets still apply.";
 
@@ -46,7 +46,10 @@ fn window(v: &Value) -> Option<Window> {
 }
 
 /// `five_hour` and `seven_day`, with the `limits[]` array (`session`,
-/// `weekly_all`) as a fallback shape.
+/// `weekly_all`) as a fallback shape. A `weekly_scoped` row names a model
+/// family whose use is capped at a share of the weekly limit (Fable: half of
+/// it, 2026-11); its percent is the share of that allowance used, so it gets
+/// its own window keyed by the model's name (`fable`).
 fn parse(v: &Value, now: i64) -> Option<Reading> {
     let mut r = Reading::new(now);
     if let Some(w) = v.get("five_hour").and_then(window) {
@@ -62,6 +65,12 @@ fn parse(v: &Value, now: i64) -> Option<Reading> {
             match l.get("kind").and_then(Value::as_str) {
                 Some("session") => r.add(FIVE_HOUR, Window::pct(used, resets_at)),
                 Some("weekly_all") => r.add(WEEKLY, Window::pct(used, resets_at)),
+                Some("weekly_scoped") => {
+                    let model = l.pointer("/scope/model/display_name").and_then(Value::as_str).unwrap_or("");
+                    if model.to_ascii_lowercase().starts_with("fable") {
+                        r.add(FABLE, Window::pct(used, resets_at));
+                    }
+                }
                 _ => {}
             }
         }
@@ -117,7 +126,22 @@ mod tests {
         let r = parse(&v, 0).unwrap();
         assert_eq!(r.get(FIVE_HOUR).unwrap().used, 22.0);
         assert_eq!(r.get(WEEKLY).unwrap().used, 6.0);
+        assert!(r.get(FABLE).is_none()); // a scoped row without a model is not a Fable share
         assert!(parse(&json(r#"{"error":"x"}"#), 0).is_none());
+    }
+
+    #[test]
+    fn fable_share() {
+        // The 2026-11-09 shape: Ultra has no 5-hour window; Fable is a scoped weekly row.
+        let v = json(
+            r#"{"five_hour":null,"seven_day":{"utilization":21.0,"resets_at":"2026-11-15T23:59:59.974889+00:00"},
+            "limits":[{"kind":"weekly_all","group":"weekly","percent":21,"resets_at":"2026-11-15T23:59:59.974889+00:00","scope":null},
+                {"kind":"weekly_scoped","group":"weekly","percent":34,"resets_at":"2026-11-16T00:00:00+00:00",
+                 "scope":{"model":{"id":null,"display_name":"Fable"},"surface":null},"is_active":false}]}"#,
+        );
+        let r = parse(&v, 0).unwrap();
+        assert_eq!(r.windows.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), [WEEKLY, FABLE]);
+        assert_eq!(r.get(FABLE), Some(Window::pct(34.0, 1_794_787_200)));
     }
 
     #[test]

@@ -53,7 +53,22 @@ fn parse(v: &Value, now: i64) -> Option<Reading> {
     r.sort_known();
     r.email = v.get("email").and_then(Value::as_str).map(str::to_owned);
     r.plan = v.get("plan_type").and_then(Value::as_str).map(title_case);
+    r.note = unavailable_models(v);
     Some(r)
+}
+
+/// `model_usage` flags models that have their own limit (GPT-6 Astra,
+/// 2026-11). The server gives no percent for them, only whether they can run
+/// now, so a blocked one becomes a note in the tooltip. The note names no
+/// time: readings are cached and shown later, where a countdown would be stale.
+fn unavailable_models(v: &Value) -> Option<String> {
+    let models = v.get("model_usage")?.as_object()?;
+    let blocked: Vec<&str> = models
+        .iter()
+        .filter(|(_, m)| m.get("available").and_then(Value::as_bool) == Some(false))
+        .map(|(name, _)| name.as_str())
+        .collect();
+    (!blocked.is_empty()).then(|| format!("Model limit reached: {}", blocked.join(", ")))
 }
 
 #[cfg(test)]
@@ -76,6 +91,16 @@ mod tests {
         assert_eq!(r.get(FIVE_HOUR), None);
         assert_eq!(r.plan.as_deref(), Some("Pro"));
         assert_eq!(r.email.as_deref(), Some("a@b.c"));
+        assert_eq!(r.note, None);
+    }
+
+    #[test]
+    fn model_availability_note() {
+        let base = r#""rate_limit":{"primary_window":{"used_percent":30,"limit_window_seconds":604800,"reset_at":99}}"#;
+        let ok = json(&format!(r#"{{{base},"model_usage":{{"gpt-6-astra":{{"available":true,"available_at":null}}}}}}"#));
+        assert_eq!(parse(&ok, 0).unwrap().note, None);
+        let out = json(&format!(r#"{{{base},"model_usage":{{"gpt-6-astra":{{"available":false,"available_at":7200}}}}}}"#));
+        assert_eq!(parse(&out, 0).unwrap().note.as_deref(), Some("Model limit reached: gpt-6-astra"));
     }
 
     #[test]

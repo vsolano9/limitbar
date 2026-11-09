@@ -94,6 +94,7 @@ and, usually, a reset time. Each has a key:
 | `five_hour` | `5h` | Claude, Codex (plans with a 5-hour window; not Claude Ultra) |
 | `daily` | `day` | Grok (when the server reports a daily period) |
 | `weekly` | `wk` | Claude, Codex, Grok |
+| `fable` | `fab` | Claude: the share of the weekly limit Fable models may use (half of it on Max and Ultra), percent of that share used |
 | `monthly` | `mo` | Grok (when the server reports a monthly period) |
 | `auto` | `cur` | Cursor: Cursor models (Auto + Composer) |
 | `api` | `api` | Cursor: other models (named third-party models) |
@@ -115,7 +116,7 @@ Custom providers use whatever keys they define.
 ```
 
 Built-ins default to their usual rows (Claude: `5h`, while the plan has a
-5-hour window, and `wk`; Codex: `wk`;
+5-hour window, `wk`, and `fab` where the plan includes Fable; Codex: `wk`;
 Grok: its credit period; Cursor: `cur` and `api`; system: `cpu`, `mem` and
 `gpu`). `http` sources default to
 their `windows`; `command` and `file` sources without `bars` draw the first
