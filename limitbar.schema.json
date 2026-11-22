@@ -142,8 +142,8 @@
     "source": {
       "type": "object",
       "properties": {
-        "provider": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file", "system"] },
-        "kind": { "enum": ["claude", "codex", "grok", "cursor", "http", "command", "file", "system"], "description": "Older name for provider." },
+        "provider": { "enum": ["claude", "codex", "grok", "cursor", "antigravity", "http", "command", "file", "system"] },
+        "kind": { "enum": ["claude", "codex", "grok", "cursor", "antigravity", "http", "command", "file", "system"], "description": "Older name for provider." },
         "label": { "type": "string", "description": "Short tag on the taskbar." },
         "name": { "type": "string", "description": "Name in the tooltip." },
         "id": { "type": "string", "description": "Cache key; defaults to the name." },

@@ -170,7 +170,7 @@ fn placeholder() -> Source {
     }
 }
 
-const NO_SOURCES: &str = "No signed-in providers found. Sign in to Claude Code, Codex, Grok Build or Cursor Agent, \
+const NO_SOURCES: &str = "No signed-in providers found. Sign in to Claude Code, Codex, Grok Build, Cursor Agent or Antigravity, \
 or add your own provider: right-click > Edit settings.";
 
 fn build_views(cfg: &Config, previous: Vec<View>) -> Vec<View> {

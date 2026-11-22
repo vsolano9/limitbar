@@ -64,7 +64,7 @@ Without `"auto"`, only the sources you list are shown.
 
 | Option | Meaning |
 |---|---|
-| `provider` | Required. `claude`, `codex`, `grok`, `cursor`, `http`, `command`, `file` or `system`. (`kind` is accepted too.) |
+| `provider` | Required. `claude`, `codex`, `grok`, `cursor`, `antigravity`, `http`, `command`, `file` or `system`. (`kind` is accepted too.) |
 | `label` | Short tag on the taskbar. Built-ins default to `CL`, `CX`, `GK`, `CU`, system sources to `PC`; custom sources to the first two letters of `name`. |
 | `name` | Name at the top of the tooltip. |
 | `id` | Key for the cached values. Defaults to `name` in lower case without spaces; change it only to keep history when renaming. |
@@ -78,7 +78,7 @@ Options for specific providers:
 
 | Provider | Option | Meaning |
 |---|---|---|
-| `claude`, `codex`, `grok`, `cursor` | `dir` | Where that CLI keeps its sign-in, if not the default. `~` and `%VARIABLES%` are expanded. |
+| `claude`, `codex`, `grok`, `cursor`, `antigravity` | `dir` | Where that CLI keeps its sign-in, if not the default. `~` and `%VARIABLES%` are expanded. |
 | `http` | `url`, `method`, `headers`, `body`, `vars`, `expires`, `windows`, `plan`, `account`, `note` | See [providers.md](providers.md#http). |
 | `command` | `command`, `timeout_seconds` | See [providers.md](providers.md#command). |
 | `file` | `path` | See [providers.md](providers.md#file). |
@@ -98,6 +98,8 @@ and, usually, a reset time. Each has a key:
 | `monthly` | `mo` | Grok (when the server reports a monthly period) |
 | `auto` | `cur` | Cursor: Cursor models (Auto + Composer) |
 | `api` | `api` | Cursor: other models (named third-party models) |
+| `gemini` | `gem` | Antigravity: Gemini models (5-hour pool) |
+| `partner` | `3p` | Antigravity: Claude and GPT-OSS models (5-hour pool) |
 | `cpu` | `cpu` | System: processor time |
 | `memory` | `mem` | System: memory in use |
 | `gpu` | `gpu` | System: busiest GPU engine |

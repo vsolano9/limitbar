@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::jsonc;
 use crate::render::{Rgba, rgba};
 use crate::system;
-use crate::usage::{CURSOR_API, CURSOR_AUTO, DAILY, FABLE, FIVE_HOUR, MONTHLY, WEEKLY};
+use crate::usage::{AG_GEMINI, AG_PARTNER, CURSOR_API, CURSOR_AUTO, DAILY, FABLE, FIVE_HOUR, MONTHLY, WEEKLY};
 
 pub const MIN_POLL: u64 = 60;
 /// Custom providers may poll faster (a local script or file costs nothing).
@@ -34,10 +34,11 @@ pub enum Builtin {
     Codex,
     Grok,
     Cursor,
+    Antigravity,
 }
 
 impl Builtin {
-    pub const ALL: [Builtin; 4] = [Builtin::Claude, Builtin::Codex, Builtin::Grok, Builtin::Cursor];
+    pub const ALL: [Builtin; 5] = [Builtin::Claude, Builtin::Codex, Builtin::Grok, Builtin::Cursor, Builtin::Antigravity];
 
     fn parse(s: &str) -> Option<Builtin> {
         Builtin::ALL.into_iter().find(|k| k.key() == s)
@@ -50,6 +51,7 @@ impl Builtin {
             Builtin::Codex => "codex",
             Builtin::Grok => "grok",
             Builtin::Cursor => "cursor",
+            Builtin::Antigravity => "antigravity",
         }
     }
 
@@ -65,6 +67,7 @@ impl Builtin {
             Builtin::Codex => ("CX", "Codex"),
             Builtin::Grok => ("GK", "Grok"),
             Builtin::Cursor => ("CU", "Cursor"),
+            Builtin::Antigravity => ("AG", "Antigravity"),
         }
     }
 
@@ -87,6 +90,7 @@ impl Builtin {
             Builtin::Codex => &[(&[WEEKLY], false)],
             Builtin::Grok => &[(&[WEEKLY, MONTHLY, DAILY], false)],
             Builtin::Cursor => &[(&[CURSOR_AUTO], false), (&[CURSOR_API], false)],
+            Builtin::Antigravity => &[(&[AG_GEMINI], false), (&[AG_PARTNER], true)],
         }
     }
 
@@ -97,6 +101,7 @@ impl Builtin {
             Builtin::Codex => "https://chatgpt.com/codex/settings/usage",
             Builtin::Grok => "https://grok.com/?_s=usage",
             Builtin::Cursor => "https://cursor.com/dashboard?tab=usage",
+            Builtin::Antigravity => "https://one.google.com/ai",
         }
     }
 
@@ -106,6 +111,7 @@ impl Builtin {
             Builtin::Codex => ColorPair { dark: rgba(150, 168, 255, 1.0), light: rgba(64, 86, 214, 1.0) },
             Builtin::Grok => ColorPair { dark: rgba(204, 210, 222, 1.0), light: rgba(82, 90, 106, 1.0) },
             Builtin::Cursor => ColorPair { dark: rgba(96, 208, 168, 1.0), light: rgba(0, 132, 102, 1.0) },
+            Builtin::Antigravity => ColorPair { dark: rgba(122, 170, 255, 1.0), light: rgba(26, 102, 214, 1.0) },
         }
     }
 
@@ -116,6 +122,7 @@ impl Builtin {
             Builtin::Codex => env_path("CODEX_HOME").unwrap_or_else(|| home.join(".codex")),
             Builtin::Grok => home.join(".grok"),
             Builtin::Cursor => appdata.join("Cursor"),
+            Builtin::Antigravity => home.join(".gemini"),
         }
     }
 }
@@ -456,7 +463,11 @@ fn builtin_source(kind: Builtin, id: String, label: String, name: String, dir: P
 /// and Cursor, each if it is signed in. `.claude-account<N>` directories are
 /// shown as `C<N>`; several logins are numbered in order.
 pub fn discover(home: &Path, appdata: &Path) -> Vec<Source> {
-    let signed_in = |dir: &Path, kind: Builtin| dir.join(kind.credential_file()).is_file();
+    let signed_in = |dir: &Path, kind: Builtin| match kind {
+        // agy keeps its sign-in in Windows Credential Manager, not a file.
+        Builtin::Antigravity => dir.is_dir() && crate::providers::antigravity_signed_in(),
+        _ => dir.join(kind.credential_file()).is_file(),
+    };
     let suffix_of = |dir: &Path| dir.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_prefix(".claude-")).unwrap_or("").to_owned();
     let main = Builtin::Claude.default_dir(home, appdata);
     let mut claude: Vec<(String, PathBuf)> = std::fs::read_dir(home)
@@ -490,7 +501,7 @@ pub fn discover(home: &Path, appdata: &Path) -> Vec<Source> {
             builtin_source(Builtin::Claude, id, label, name, dir)
         })
         .collect();
-    for kind in [Builtin::Codex, Builtin::Grok, Builtin::Cursor] {
+    for kind in [Builtin::Codex, Builtin::Grok, Builtin::Cursor, Builtin::Antigravity] {
         let dir = kind.default_dir(home, appdata);
         if signed_in(&dir, kind) {
             let (label, name) = kind.default_label();
@@ -737,7 +748,7 @@ impl Parser<'_> {
                 "system" => Provider::System { top: v.get("top").and_then(Value::as_u64).map_or(SYSTEM_TOP, |n| n.min(10) as usize) },
                 other => {
                     self.warn(format!(
-                        "{what}: unknown provider \"{other}\" (expected claude, codex, grok, cursor, http, command, file or system)"
+                        "{what}: unknown provider \"{other}\" (expected claude, codex, grok, cursor, antigravity, http, command, file or system)"
                     ));
                     return None;
                 }

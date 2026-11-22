@@ -5,6 +5,7 @@
 //! the settings file, and `system` measures this PC (see `system.rs`). See
 //! CONTRIBUTING.md for adding a built-in provider.
 
+mod antigravity;
 mod claude;
 mod codex;
 mod command;
@@ -15,6 +16,8 @@ mod http;
 pub mod values;
 
 use std::path::Path;
+
+pub use antigravity::signed_in as antigravity_signed_in;
 
 use serde_json::Value;
 
@@ -61,6 +64,7 @@ pub fn fetch(http: &Http, src: &Source, profile: &mut Profile) -> Outcome {
             Builtin::Codex => codex::fetch(http, dir),
             Builtin::Grok => grok::fetch(http, dir, profile),
             Builtin::Cursor => cursor::fetch(http, dir, profile),
+            Builtin::Antigravity => antigravity::fetch(http, dir, profile),
         },
         Provider::Http(spec) => http::fetch(http, spec),
         Provider::Command { line, timeout } => command::fetch(line, *timeout),

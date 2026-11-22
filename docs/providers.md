@@ -26,7 +26,7 @@ have grown; Limitbar keeps showing the last values and drops a window to 0%
 once its reset time passes. The next time you use that CLI it refreshes its own
 token and Limitbar picks it up.
 
-The Grok and Cursor endpoints are undocumented, so every field is parsed
+The Grok, Cursor and Antigravity endpoints are undocumented, so every field is parsed
 defensively. Limitbar is not affiliated with any of these companies; an
 endpoint can change without notice.
 
@@ -35,6 +35,7 @@ endpoint can change without notice.
 | `claude` (Claude Code, Pro/Max/Ultra sign-in) | `weekly`, plus `five_hour` on plans that have one (Ultra has none once Anthropic lifts it for the account), plus `fable` where the plan includes Fable up to a share of the weekly limit (percent of that share used) | `<dir>\.credentials.json` (`claudeAiOauth.accessToken`); account from `<dir>\.claude.json` | `GET https://api.anthropic.com/api/oauth/usage` |
 | `codex` (Codex CLI, ChatGPT sign-in) | `weekly`, plus `five_hour` on plans that have one; a tooltip note ("Model limit reached: gpt-6-astra") when the report marks a model with its own limit unavailable | `<dir>\auth.json` (`tokens.access_token`, `tokens.account_id`) | `GET https://chatgpt.com/backend-api/wham/usage` |
 | `grok` (Grok Build CLI) | the credit period: `weekly`, `monthly` or `daily` | `<dir>\auth.json`, first `https://auth.x.ai::<id>` entry | `GET https://cli-chat-proxy.grok.com/v1/billing?format=credits`; plan from `/v1/settings` |
+| `antigravity` (Google's `agy` CLI, Google AI Pro/Ultra sign-in) | `gemini` (Gemini models) and `partner` (Claude and GPT-OSS models), each a 5-hour pool; percent used is `1 - remainingFraction` of the pool's most-used model | Windows Credential Manager generic credential `gemini:antigravity` (`token.access_token`, `token.expiry`); project from `<dir>ntigravity-cli\cache\default_project_id.txt` | `POST https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels`; plan from `v1internal:loadCodeAssist` |
 | `cursor` (Cursor Agent CLI) | `auto` (Cursor models), `api` (other models) | `<dir>\auth.json` (`accessToken`); account from `~\.cursor\cli-config.json` | `POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage`; plan from `GetPlanInfo` |
 
 API-key logins (for example `codex` with an OpenAI API key) have no plan

@@ -22,6 +22,10 @@ pub const FABLE: &str = "fable";
 pub const CURSOR_AUTO: &str = "auto";
 /// Named third-party models in Cursor (Claude, GPT, Gemini, ...).
 pub const CURSOR_API: &str = "api";
+/// Antigravity's Gemini models pool (5-hour).
+pub const AG_GEMINI: &str = "gemini";
+/// Antigravity's partner models pool: Claude, GPT-OSS (5-hour).
+pub const AG_PARTNER: &str = "partner";
 
 /// Well-known keys: short tag drawn beside the bar and the full name used in
 /// the tooltip, in tooltip order. Any other key is shown as reported.
@@ -33,6 +37,8 @@ const NAMES: &[(&str, &str, &str)] = &[
     (MONTHLY, "mo", "Monthly"),
     (CURSOR_AUTO, "cur", "Cursor models (Auto + Composer)"),
     (CURSOR_API, "api", "Other models (API)"),
+    (AG_GEMINI, "gem", "Gemini models (5-hour)"),
+    (AG_PARTNER, "3p", "Claude and GPT-OSS models (5-hour)"),
     (system::CPU, "cpu", "CPU"),
     (system::MEMORY, "mem", "Memory"),
     (system::GPU, "gpu", "GPU"),

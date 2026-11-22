@@ -1,7 +1,7 @@
 # Limitbar
 
 A tiny widget that lives inside the Windows 11 taskbar and shows how much of
-your AI plan limits you have used: Claude, Codex, Grok and Cursor out of the
+your AI plan limits you have used: Claude, Codex, Grok, Cursor and Antigravity out of the
 box, and any other provider, API or quota you add in a few lines of settings.
 It can also show your PC's CPU, memory, GPU, disk and network load.
 
@@ -15,7 +15,7 @@ API rate limit (`http`) and disk usage on C: (`command`).*
 *Three Claude Code accounts, Codex, Grok and Cursor, and a `system` source (`PC`)
 with live CPU, memory and GPU load.*
 
-- **Zero setup** for Claude Code, Codex, Grok Build and Cursor Agent: it finds
+- **Zero setup** for Claude Code, Codex, Grok Build, Cursor Agent and Antigravity: it finds
   every signed-in CLI (and every Claude Code account) and shows its 5-hour,
   weekly or monthly windows.
 - **Any provider, as many as you want**: point an `http` source at a JSON

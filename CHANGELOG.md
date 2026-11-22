@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.0 - 2026-11-22
+
+- **Antigravity** (Google's `agy` CLI with a Google AI Pro or Ultra sign-in) is a new built-in provider, `AG`. It draws two 5-hour pools: `gem` for Gemini models and `3p` for the Claude and GPT-OSS models Antigravity also serves, with their reset times, and the tooltip shows the plan (`Google AI Pro`). It reads the sign-in `agy` keeps in Windows Credential Manager (`gemini:antigravity`) without refreshing or writing it; like the other built-ins it shows as idle once that token expires, until `agy` runs again. Signed-in PCs find it automatically; add `{ "provider": "antigravity" }` to an explicit `sources` list.
+
 ## 2.3.0 - 2026-11-09
 
 - **Claude's Fable share**: Max and Ultra include Fable models up to half of the weekly limit. Claude sources now draw a `fab` row with the percent of that share used (and its reset) beside `wk`, and the tooltip and `--probe` list it. It appears only where Anthropic reports the share, and the cached state keeps it under the key `fable` for scripts that read Limitbar's state.

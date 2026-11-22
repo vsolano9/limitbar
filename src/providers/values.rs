@@ -36,7 +36,7 @@ pub fn resolve(src: &ValueSource) -> Result<String, String> {
 
 /// The password of a generic credential, e.g. one saved with
 /// `cmdkey /generic:limitbar/openrouter /user:me /pass:<key>`.
-fn credential(target: &str) -> Result<String, String> {
+pub(crate) fn credential(target: &str) -> Result<String, String> {
     use windows_sys::Win32::Security::Credentials::{CRED_TYPE_GENERIC, CREDENTIALW, CredFree, CredReadW};
     let mut pcred: *mut CREDENTIALW = std::ptr::null_mut();
     let ok = unsafe { CredReadW(crate::wide(target).as_ptr(), CRED_TYPE_GENERIC, 0, &mut pcred) };
