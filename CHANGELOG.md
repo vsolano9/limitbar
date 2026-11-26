@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1 - 2026-11-26
+
+- **Antigravity file-storage & T3 Code profiles**: `antigravity` now also reads read-only OAuth tokens from `<dir>\antigravity-cli\antigravity-oauth-token` and `<T3CODE_HOME|~/.t3>\userdata\providers\antigravity\*\antigravity-acp\antigravity-oauth-token` beside Windows Credential Manager (`gemini:antigravity`), picking the freshest non-expired token by `token.expiry` (and its matching `default_project_id.txt`). This keeps `AG` usage fresh when Antigravity runs under T3 Code's file-storage ACP profiles without needing standalone `agy` to refresh Credential Manager.
+
 ## 2.4.0 - 2026-11-22
 
 - **Antigravity** (Google's `agy` CLI with a Google AI Pro or Ultra sign-in) is a new built-in provider, `AG`. It draws two 5-hour pools: `gem` for Gemini models and `3p` for the Claude and GPT-OSS models Antigravity also serves, with their reset times, and the tooltip shows the plan (`Google AI Pro`). It reads the sign-in `agy` keeps in Windows Credential Manager (`gemini:antigravity`) without refreshing or writing it; like the other built-ins it shows as idle once that token expires, until `agy` runs again. Signed-in PCs find it automatically; add `{ "provider": "antigravity" }` to an explicit `sources` list.
